@@ -24,6 +24,7 @@ class PomodoroTimer: ObservableObject {
     private(set) var timeRemaining: Int = 25 * 60
     private(set) var isRunning: Bool = false
     private(set) var isPaused: Bool = false
+    private var isObservingWorkspace: Bool = false
     
     func start() {
         guard !isRunning else { return }
@@ -38,24 +39,28 @@ class PomodoroTimer: ObservableObject {
             pausedDuration = 0
         }
         
-        // Register for sleep/wake notifications
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(systemWillSleep),
-            name: NSWorkspace.willSleepNotification,
-            object: nil
-        )
+        // Register for sleep/wake notifications (only if not already observing)
+        if !isObservingWorkspace {
+            NSWorkspace.shared.notificationCenter.addObserver(
+                self,
+                selector: #selector(systemWillSleep),
+                name: NSWorkspace.willSleepNotification,
+                object: nil
+            )
+            
+            NSWorkspace.shared.notificationCenter.addObserver(
+                self,
+                selector: #selector(systemDidWake),
+                name: NSWorkspace.didWakeNotification,
+                object: nil
+            )
+            
+            isObservingWorkspace = true
+        }
         
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(systemDidWake),
-            name: NSWorkspace.didWakeNotification,
-            object: nil
-        )
-        
-        // Create timer on background queue to avoid blocking UI
-        let timer = Timer(timeInterval: 0.1, repeats: true) { _ in
-            self.tick()
+        // Create timer with weak self to avoid retain cycle
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.tick()
         }
         
         // Add timer to main run loop with .common mode to continue during menu interactions
@@ -72,7 +77,10 @@ class PomodoroTimer: ObservableObject {
         isPaused = true
         
         // Remove sleep/wake observers
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        if isObservingWorkspace {
+            NSWorkspace.shared.notificationCenter.removeObserver(self)
+            isObservingWorkspace = false
+        }
         
         delegate?.timerDidUpdate()
     }
@@ -87,7 +95,10 @@ class PomodoroTimer: ObservableObject {
         pauseStartTime = nil
         
         // Remove sleep/wake observers
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        if isObservingWorkspace {
+            NSWorkspace.shared.notificationCenter.removeObserver(self)
+            isObservingWorkspace = false
+        }
         
         delegate?.timerDidUpdate()
     }
@@ -146,5 +157,12 @@ class PomodoroTimer: ObservableObject {
     private func complete() {
         stop()
         delegate?.timerDidComplete()
+    }
+    
+    deinit {
+        timer?.invalidate()
+        if isObservingWorkspace {
+            NSWorkspace.shared.notificationCenter.removeObserver(self)
+        }
     }
 }

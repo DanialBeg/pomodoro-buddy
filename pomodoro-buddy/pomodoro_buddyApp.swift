@@ -36,6 +36,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pomodoroTimer?.delegate = self
     }
     
+    func applicationWillTerminate(_ notification: Notification) {
+        cleanup()
+    }
+    
     private func setupLaunchAtLogin() {
         // Enable launch at login by default if not already configured
         if !isLaunchAtLoginEnabled() {
@@ -57,7 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupNotifications() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] granted, error in
             if let error = error {
                 print("Notification permission error: \(error)")
             }
@@ -89,6 +93,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupMenu() {
+        // Clean up existing menu to prevent memory leaks
+        statusItem?.menu?.removeAllItems()
+        
         let menu = NSMenu()
         
         // Dynamic start/pause button
@@ -308,7 +315,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func quit() {
+        cleanup()
         NSApplication.shared.terminate(nil)
+    }
+    
+    private func cleanup() {
+        pomodoroTimer?.stop()
+        pomodoroTimer = nil
+        
+        if let statusItem = statusItem {
+            statusItem.menu?.removeAllItems()
+            statusItem.menu = nil
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
+        statusItem = nil
     }
 }
 
@@ -340,7 +360,7 @@ extension AppDelegate: PomodoroTimerDelegate {
         
         let request = UNNotificationRequest(identifier: "pomodoro-complete", content: content, trigger: nil)
         
-        UNUserNotificationCenter.current().add(request) { error in
+        UNUserNotificationCenter.current().add(request) { [weak self] error in
             if let error = error {
                 print("Notification error: \(error)")
             }
