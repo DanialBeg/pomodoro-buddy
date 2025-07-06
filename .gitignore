@@ -91,3 +91,8 @@ iOSInjectionProject/
 
 # macOS
 .DS_Store
+
+# Build artifacts and distribution
+build/
+dist/
+*.xcarchive
