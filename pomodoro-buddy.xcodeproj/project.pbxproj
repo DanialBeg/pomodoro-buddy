@@ -8,12 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		43FAE87D2E19B10F00620553 /* pomodoro_buddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAE87C2E19B10F00620553 /* pomodoro_buddyApp.swift */; };
-		43FAE87F2E19B10F00620553 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAE87E2E19B10F00620553 /* ContentView.swift */; };
 		43FAE8812E19B11000620553 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 43FAE8802E19B11000620553 /* Assets.xcassets */; };
 		43FAE8842E19B11000620553 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 43FAE8832E19B11000620553 /* Preview Assets.xcassets */; };
 		43FAE88F2E19B11100620553 /* pomodoro_buddyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAE88E2E19B11100620553 /* pomodoro_buddyTests.swift */; };
 		43FAE8992E19B11100620553 /* pomodoro_buddyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAE8982E19B11100620553 /* pomodoro_buddyUITests.swift */; };
 		43FAE89B2E19B11100620553 /* pomodoro_buddyUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAE89A2E19B11100620553 /* pomodoro_buddyUITestsLaunchTests.swift */; };
+		43FAE8A82E19B21000620553 /* PomodoroTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAE8A72E19B21000620553 /* PomodoroTimer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,7 +36,6 @@
 /* Begin PBXFileReference section */
 		43FAE8792E19B10F00620553 /* pomodoro-buddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "pomodoro-buddy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		43FAE87C2E19B10F00620553 /* pomodoro_buddyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = pomodoro_buddyApp.swift; sourceTree = "<group>"; };
-		43FAE87E2E19B10F00620553 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		43FAE8802E19B11000620553 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		43FAE8832E19B11000620553 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		43FAE8852E19B11000620553 /* pomodoro_buddy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = pomodoro_buddy.entitlements; sourceTree = "<group>"; };
@@ -45,6 +44,7 @@
 		43FAE8942E19B11100620553 /* pomodoro-buddyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "pomodoro-buddyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		43FAE8982E19B11100620553 /* pomodoro_buddyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = pomodoro_buddyUITests.swift; sourceTree = "<group>"; };
 		43FAE89A2E19B11100620553 /* pomodoro_buddyUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = pomodoro_buddyUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		43FAE8A72E19B21000620553 /* PomodoroTimer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PomodoroTimer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,7 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				43FAE87C2E19B10F00620553 /* pomodoro_buddyApp.swift */,
-				43FAE87E2E19B10F00620553 /* ContentView.swift */,
+				43FAE8A72E19B21000620553 /* PomodoroTimer.swift */,
 				43FAE8802E19B11000620553 /* Assets.xcassets */,
 				43FAE8852E19B11000620553 /* pomodoro_buddy.entitlements */,
 				43FAE8822E19B11000620553 /* Preview Content */,
@@ -259,7 +259,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				43FAE87F2E19B10F00620553 /* ContentView.swift in Sources */,
+				43FAE8A82E19B21000620553 /* PomodoroTimer.swift in Sources */,
 				43FAE87D2E19B10F00620553 /* pomodoro_buddyApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
