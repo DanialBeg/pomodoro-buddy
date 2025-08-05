@@ -36,6 +36,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pomodoroTimer?.delegate = self
     }
     
+    func applicationWillTerminate(_ notification: Notification) {
+        cleanup()
+    }
+    
     private func setupLaunchAtLogin() {
         // Enable launch at login by default if not already configured
         if !isLaunchAtLoginEnabled() {
@@ -83,12 +87,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func toggleMenu() {
-        if let menu = statusItem?.menu {
-            statusItem?.popUpMenu(menu)
-        }
+        statusItem?.button?.performClick(nil)
     }
     
     private func setupMenu() {
+        // Clean up existing menu to prevent memory leaks
+        statusItem?.menu?.removeAllItems()
+        
         let menu = NSMenu()
         
         // Dynamic start/pause button
@@ -287,7 +292,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func isLaunchAtLoginEnabled() -> Bool {
-        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return false }
+        guard Bundle.main.bundleIdentifier != nil else { return false }
         return SMAppService.mainApp.status == .enabled
     }
     
@@ -308,7 +313,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func quit() {
+        cleanup()
         NSApplication.shared.terminate(nil)
+    }
+    
+    private func cleanup() {
+        pomodoroTimer?.stop()
+        pomodoroTimer = nil
+        
+        if let statusItem = statusItem {
+            statusItem.menu?.removeAllItems()
+            statusItem.menu = nil
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
+        statusItem = nil
     }
 }
 
