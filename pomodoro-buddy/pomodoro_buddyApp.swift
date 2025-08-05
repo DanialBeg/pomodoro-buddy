@@ -61,7 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupNotifications() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] granted, error in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error = error {
                 print("Notification permission error: \(error)")
             }
@@ -87,9 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func toggleMenu() {
-        if let menu = statusItem?.menu {
-            statusItem?.popUpMenu(menu)
-        }
+        statusItem?.button?.performClick(nil)
     }
     
     private func setupMenu() {
@@ -294,7 +292,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func isLaunchAtLoginEnabled() -> Bool {
-        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return false }
+        guard Bundle.main.bundleIdentifier != nil else { return false }
         return SMAppService.mainApp.status == .enabled
     }
     
@@ -360,7 +358,7 @@ extension AppDelegate: PomodoroTimerDelegate {
         
         let request = UNNotificationRequest(identifier: "pomodoro-complete", content: content, trigger: nil)
         
-        UNUserNotificationCenter.current().add(request) { [weak self] error in
+        UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 print("Notification error: \(error)")
             }
