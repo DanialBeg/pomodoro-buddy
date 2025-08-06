@@ -11,6 +11,7 @@ import AppKit
 protocol PomodoroTimerDelegate: AnyObject {
     func timerDidUpdate()
     func timerDidComplete()
+    func sessionTypeDidChange(_ sessionType: SessionType)
 }
 
 class PomodoroTimer: ObservableObject {
@@ -25,6 +26,13 @@ class PomodoroTimer: ObservableObject {
     private(set) var isRunning: Bool = false
     private(set) var isPaused: Bool = false
     private var isObservingWorkspace: Bool = false
+    
+    // Full Pomodoro cycle properties
+    private(set) var currentSessionType: SessionType = .work
+    private(set) var workSessionsCompleted: Int = 0
+    private(set) var cyclePosition: Int = 1 // 1-4 for work sessions
+    private var fullPomodoroMode: Bool = false
+    private var settings: UserSettings?
     
     func start() {
         guard !isRunning else { return }
@@ -125,6 +133,40 @@ class PomodoroTimer: ObservableObject {
         delegate?.timerDidUpdate()
     }
     
+    func configureTimer(settings: UserSettings) {
+        self.settings = settings
+        self.fullPomodoroMode = settings.fullPomodoroMode
+        
+        // Set timer duration based on current session type
+        updateTimerForCurrentSession()
+    }
+    
+    private func updateTimerForCurrentSession() {
+        guard let settings = settings else { return }
+        
+        let duration: Int
+        switch currentSessionType {
+        case .work:
+            duration = settings.workDuration * 60
+        case .shortBreak:
+            duration = settings.shortBreakDuration * 60
+        case .longBreak:
+            duration = settings.longBreakDuration * 60
+        }
+        
+        totalTime = duration
+        if !isRunning && !isPaused {
+            timeRemaining = duration
+        }
+        
+        delegate?.timerDidUpdate()
+        delegate?.sessionTypeDidChange(currentSessionType)
+    }
+    
+    func getCurrentSessionInfo() -> (type: SessionType, position: Int, totalInCycle: Int) {
+        return (currentSessionType, cyclePosition, settings?.longBreakInterval ?? 4)
+    }
+    
     private func tick() {
         guard let startTime = startTime else { return }
         
@@ -155,8 +197,51 @@ class PomodoroTimer: ObservableObject {
     }
     
     private func complete() {
+        if fullPomodoroMode {
+            handleFullPomodoroCompletion()
+        } else {
+            // Simple work timer mode - just stop
+            stop()
+            delegate?.timerDidComplete()
+        }
+    }
+    
+    private func handleFullPomodoroCompletion() {
+        guard let settings = settings else {
+            stop()
+            delegate?.timerDidComplete()
+            return
+        }
+        
+        switch currentSessionType {
+        case .work:
+            workSessionsCompleted += 1
+            cyclePosition += 1
+            
+            // Determine next session type
+            if cyclePosition > settings.longBreakInterval {
+                // Time for long break
+                currentSessionType = .longBreak
+                cyclePosition = 1 // Reset for next cycle
+            } else {
+                // Time for short break
+                currentSessionType = .shortBreak
+            }
+            
+        case .shortBreak, .longBreak:
+            // Break completed, back to work
+            currentSessionType = .work
+        }
+        
+        // Update timer for new session type
+        updateTimerForCurrentSession()
+        
+        // Notify completion
         stop()
         delegate?.timerDidComplete()
+        
+        // Auto-start next session if desired (for now, require manual start)
+        // Could add an auto-start setting later
     }
     
     deinit {

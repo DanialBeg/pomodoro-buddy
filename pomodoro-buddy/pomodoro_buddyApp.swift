@@ -13,6 +13,7 @@ import ServiceManagement
 @main
 struct pomodoro_buddyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @AppStorage("launchAtLogin") private var launchAtLogin = false
     
     var body: some Scene {
         Settings {
@@ -24,20 +25,66 @@ struct pomodoro_buddyApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var pomodoroTimer: PomodoroTimer?
+    var mainWindow: NSWindow?
+    var dataManager: SessionDataManager?
+    var sessionStartTime: Date?
+    var keyboardShortcutManager: KeyboardShortcutManager?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         
+        // Set up app delegate to handle window closing properly
+        NSApp.delegate = self
+        
+        dataManager = SessionDataManager()
         setupMenuBar()
         setupNotifications()
         setupLaunchAtLogin()
         
         pomodoroTimer = PomodoroTimer()
         pomodoroTimer?.delegate = self
+        
+        // Apply saved settings to timer
+        if let settings = dataManager?.settings {
+            pomodoroTimer?.configureTimer(settings: settings)
+        }
+        
+        // Set up keyboard shortcuts
+        keyboardShortcutManager = KeyboardShortcutManager()
+        keyboardShortcutManager?.delegate = self
+        
+        // Register initial keyboard shortcuts
+        if let settings = dataManager?.settings {
+            let shortcuts = settings.keyboardShortcuts.map { shortcut in
+                (action: shortcut.action.rawValue, modifiers: shortcut.modifiers, key: shortcut.key, isEnabled: shortcut.isEnabled)
+            }
+            keyboardShortcutManager?.registerHotKeys(shortcuts: shortcuts)
+        }
+        
+        // Listen for settings changes
+        NotificationCenter.default.addObserver(
+            self, 
+            selector: #selector(settingsDidChange(_:)), 
+            name: .pomodoroSettingsChanged, 
+            object: nil
+        )
     }
     
     func applicationWillTerminate(_ notification: Notification) {
         cleanup()
+    }
+    
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // Never quit when last window closes - this is a menu bar app
+        print("App asked if should terminate after last window closed - returning false")
+        NSApp.setActivationPolicy(.accessory) // Ensure we stay in accessory mode
+        return false
+    }
+    
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Only allow termination if explicitly requested (via Quit menu)
+        print("App should terminate requested")
+        return .terminateNow
     }
     
     private func setupLaunchAtLogin() {
@@ -51,7 +98,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.title = "🍅"
+            button.title = "\u{1F345}"  // 🍅 tomato
             button.action = #selector(toggleMenu)
             button.target = self
         }
@@ -77,11 +124,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let seconds = timer.timeRemaining % 60
                 let timeString = String(format: "%02d:%02d", minutes, seconds)
                 
-                // Update immediately on main thread, even during menu display
-                button.title = timeString
+                // In full Pomodoro mode, show session type and progress
+                guard let settings = dataManager?.settings else {
+                    button.title = timeString
+                    button.needsDisplay = true
+                    return
+                }
+                
+                if settings.fullPomodoroMode {
+                    let sessionInfo = timer.getCurrentSessionInfo()
+                    let emoji = sessionInfo.type.emoji
+                    
+                    if sessionInfo.type == .work {
+                        button.title = "\(emoji) \(timeString) (\(sessionInfo.position)/\(sessionInfo.totalInCycle))"
+                    } else {
+                        button.title = "\(emoji) \(timeString)"
+                    }
+                } else {
+                    button.title = timeString
+                }
+                
                 button.needsDisplay = true
             } else {
-                button.title = "🍅"
+                // Show current session type when not running
+                guard let settings = dataManager?.settings, settings.fullPomodoroMode else {
+                    button.title = "\u{1F345}"  // 🍅 tomato
+                    return
+                }
+                
+                let sessionInfo = pomodoroTimer?.getCurrentSessionInfo()
+                button.title = sessionInfo?.type.emoji ?? "\u{1F345}"  // 🍅 tomato
             }
         }
     }
@@ -96,19 +168,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let menu = NSMenu()
         
+        // Show current session info in full Pomodoro mode
+        if let settings = dataManager?.settings, settings.fullPomodoroMode, let timer = pomodoroTimer {
+            let sessionInfo = timer.getCurrentSessionInfo()
+            let sessionTitle = "\(sessionInfo.type.emoji) \(sessionInfo.type.displayName)"
+            if sessionInfo.type == .work {
+                menu.addItem(NSMenuItem(title: "\(sessionTitle) (\(sessionInfo.position)/\(sessionInfo.totalInCycle))", action: nil, keyEquivalent: ""))
+            } else {
+                menu.addItem(NSMenuItem(title: sessionTitle, action: nil, keyEquivalent: ""))
+            }
+            menu.addItem(NSMenuItem.separator())
+        }
+        
         // Dynamic start/pause button
         let startPauseTitle = pomodoroTimer?.isRunning == true ? "Pause Timer" : "Start Timer"
         menu.addItem(NSMenuItem(title: startPauseTitle, action: #selector(toggleStartPause), keyEquivalent: "s"))
         menu.addItem(NSMenuItem(title: "Reset Timer", action: #selector(resetTimer), keyEquivalent: "r"))
         menu.addItem(NSMenuItem.separator())
         
+        // Statistics window
+        menu.addItem(NSMenuItem(title: "Statistics", action: #selector(showStatistics), keyEquivalent: ""))
+        
         // Create slider for custom time
         let sliderItem = createCustomTimeSliderItem()
         menu.addItem(sliderItem)
         menu.addItem(NSMenuItem.separator())
         
-        let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "l")
+        let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: nil, keyEquivalent: "")
         launchAtLoginItem.state = isLaunchAtLoginEnabled() ? .on : .off
+        
+        // Create a custom target that handles the toggle without menu dismissal
+        let target = LaunchAtLoginMenuTarget(appDelegate: self)
+        launchAtLoginItem.target = target
+        launchAtLoginItem.action = #selector(LaunchAtLoginMenuTarget.toggleLaunchAtLogin)
+        
+        // Store the target to prevent deallocation
+        launchAtLoginItem.representedObject = target
+        
         menu.addItem(launchAtLoginItem)
         
         menu.addItem(NSMenuItem.separator())
@@ -142,9 +238,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Create slider
         let slider = NSSlider(frame: NSRect(x: 15, y: 30, width: 220, height: 20))
-        slider.minValue = 1
-        slider.maxValue = 60
-        slider.doubleValue = Double(min(currentMinutes, 60))
+        slider.minValue = 0
+        slider.maxValue = 7 // 8 positions (0-7) for uniform spacing
+        
+        // Find the closest snap point and set slider to its uniform position
+        let snapPoints = [10, 15, 20, 25, 30, 45, 50, 60]
+        let closestIndex = snapPoints.enumerated().min { abs($0.1 - currentMinutes) < abs($1.1 - currentMinutes) }?.0 ?? 2
+        slider.doubleValue = Double(closestIndex)
+        
         slider.target = self
         slider.action = #selector(sliderValueChanged(_:))
         slider.numberOfTickMarks = 0 // We'll draw custom tick marks
@@ -163,16 +264,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func addTickMarks(to containerView: NSView, sliderFrame: NSRect) {
-        let snapPoints = [5, 10, 15, 25, 45, 60]
+        let snapPoints = [10, 15, 20, 25, 30, 45, 50, 60]
         let sliderStart = sliderFrame.minX
         let sliderWidth = sliderFrame.width
-        let sliderMinValue = 1.0
-        let sliderMaxValue = 60.0
         
-        for snapPoint in snapPoints {
-            // Calculate position along slider
-            let percentage = (Double(snapPoint) - sliderMinValue) / (sliderMaxValue - sliderMinValue)
-            let xPosition = sliderStart + (percentage * sliderWidth)
+        // Calculate uniform spacing between tick marks
+        let numberOfIntervals = snapPoints.count - 1
+        let intervalWidth = sliderWidth / Double(numberOfIntervals)
+        
+        for (index, snapPoint) in snapPoints.enumerated() {
+            // Calculate uniform position along slider
+            let xPosition = sliderStart + (Double(index) * intervalWidth)
             
             // Create tick mark line
             let tickMark = NSView(frame: NSRect(x: xPosition - 0.5, y: sliderFrame.minY - 8, width: 1, height: 6))
@@ -192,29 +294,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             numberLabel.isSelectable = false
             containerView.addSubview(numberLabel)
         }
-        
-        // Add min/max labels
-        let minLabel = NSTextField(labelWithString: "1")
-        minLabel.frame = NSRect(x: sliderStart - 8, y: sliderFrame.minY - 20, width: 16, height: 12)
-        minLabel.alignment = .center
-        minLabel.font = NSFont.systemFont(ofSize: 9)
-        minLabel.textColor = .tertiaryLabelColor
-        minLabel.backgroundColor = .clear
-        minLabel.isBordered = false
-        minLabel.isEditable = false
-        minLabel.isSelectable = false
-        containerView.addSubview(minLabel)
-        
-        let maxLabel = NSTextField(labelWithString: "60")
-        maxLabel.frame = NSRect(x: sliderStart + sliderWidth - 10, y: sliderFrame.minY - 20, width: 20, height: 12)
-        maxLabel.alignment = .center
-        maxLabel.font = NSFont.systemFont(ofSize: 9)
-        maxLabel.textColor = .tertiaryLabelColor
-        maxLabel.backgroundColor = .clear
-        maxLabel.isBordered = false
-        maxLabel.isEditable = false
-        maxLabel.isSelectable = false
-        containerView.addSubview(maxLabel)
     }
     
     
@@ -224,6 +303,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if timer.isRunning {
             pomodoroTimer?.pause()
         } else {
+            // Track session start time
+            sessionStartTime = Date()
             pomodoroTimer?.start()
         }
         
@@ -233,30 +314,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func resetTimer() {
         pomodoroTimer?.reset()
+        sessionStartTime = nil
         setupMenu() // Update menu to show "Start Timer"
     }
     
     @objc private func sliderValueChanged(_ sender: NSSlider) {
-        let rawValue = Int(sender.doubleValue)
+        let sliderValue = sender.doubleValue
         
-        // Define snap points for common Pomodoro intervals
-        let snapPoints = [5, 10, 15, 25, 45, 60]
-        let snapThreshold = 2 // Snap within 2 minutes
+        // Define time choices with uniform spacing
+        let snapPoints = [10, 15, 20, 25, 30, 45, 50, 60]
+        let sliderMin = sender.minValue
+        let sliderMax = sender.maxValue
+        let sliderRange = sliderMax - sliderMin
         
-        var snappedValue = rawValue
+        // Calculate which segment the slider is in (uniform spacing)
+        let segmentSize = sliderRange / Double(snapPoints.count - 1)
+        let segmentIndex = Int(round((sliderValue - sliderMin) / segmentSize))
+        let clampedIndex = max(0, min(segmentIndex, snapPoints.count - 1))
         
-        // Check if close to any snap point
-        for snapPoint in snapPoints {
-            if abs(rawValue - snapPoint) <= snapThreshold {
-                snappedValue = snapPoint
-                break
-            }
-        }
+        let snappedValue = snapPoints[clampedIndex]
         
-        // Update slider to snapped value if different
-        if snappedValue != rawValue {
-            sender.doubleValue = Double(snappedValue)
-        }
+        // Calculate the position for this snap point in uniform spacing
+        let uniformPosition = sliderMin + (Double(clampedIndex) * segmentSize)
+        
+        // Update slider to uniform position
+        sender.doubleValue = uniformPosition
         
         // Update timer
         pomodoroTimer?.setCustomTime(minutes: snappedValue)
@@ -288,15 +370,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             enableLaunchAtLogin()
         }
-        setupMenu() // Refresh menu to update checkmark
+        updateLaunchAtLoginMenuItem() // Update just the checkmark without closing menu
     }
     
-    private func isLaunchAtLoginEnabled() -> Bool {
+    private func updateLaunchAtLoginMenuItem() {
+        guard let menu = statusItem?.menu else { return }
+        
+        // Find the Launch at Login menu item and update its state
+        for item in menu.items {
+            if item.title == "Launch at Login" {
+                item.state = isLaunchAtLoginEnabled() ? .on : .off
+                break
+            }
+        }
+    }
+    
+    func isLaunchAtLoginEnabled() -> Bool {
         guard Bundle.main.bundleIdentifier != nil else { return false }
         return SMAppService.mainApp.status == .enabled
     }
     
-    private func enableLaunchAtLogin() {
+    func enableLaunchAtLogin() {
         do {
             try SMAppService.mainApp.register()
         } catch {
@@ -304,12 +398,65 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    private func disableLaunchAtLogin() {
+    func disableLaunchAtLogin() {
         do {
             try SMAppService.mainApp.unregister()
         } catch {
             print("Failed to disable launch at login: \(error)")
         }
+    }
+    
+    @objc private func showStatistics() {
+        DispatchQueue.main.async { [weak self] in
+            if self?.mainWindow == nil {
+                self?.createMainWindow()
+            }
+            
+            self?.mainWindow?.makeKeyAndOrderFront(nil)
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+    
+    private func createMainWindow() {
+        guard let dataManager = dataManager else { return }
+        let contentView = MainWindow().environmentObject(dataManager)
+        
+        mainWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 650, height: 500),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        mainWindow?.title = "Pomodoro Buddy"
+        mainWindow?.contentView = NSHostingView(rootView: contentView)
+        mainWindow?.center()
+        mainWindow?.setFrameAutosaveName("MainWindow")
+        
+        // Prevent the window from quitting the app when closed
+        mainWindow?.isReleasedWhenClosed = false
+        
+        // Handle window closing
+        mainWindow?.delegate = self
+        
+        print("Created main window with delegate set to AppDelegate")
+    }
+    
+    @objc private func settingsDidChange(_ notification: Notification) {
+        guard let settings = notification.object as? UserSettings else { return }
+        
+        // Reconfigure timer with new settings
+        pomodoroTimer?.configureTimer(settings: settings)
+        
+        // Update keyboard shortcuts
+        let shortcuts = settings.keyboardShortcuts.map { shortcut in
+            (action: shortcut.action.rawValue, modifiers: shortcut.modifiers, key: shortcut.key, isEnabled: shortcut.isEnabled)
+        }
+        keyboardShortcutManager?.registerHotKeys(shortcuts: shortcuts)
+        
+        // Update menu to reflect any changes
+        setupMenu()
     }
     
     @objc private func quit() {
@@ -321,12 +468,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pomodoroTimer?.stop()
         pomodoroTimer = nil
         
+        // Clean up keyboard shortcuts
+        keyboardShortcutManager = nil
+        
+        // Remove notification observers
+        NotificationCenter.default.removeObserver(self)
+        
+        // Close main window first
+        mainWindow?.close()
+        mainWindow = nil
+        
         if let statusItem = statusItem {
             statusItem.menu?.removeAllItems()
             statusItem.menu = nil
             NSStatusBar.system.removeStatusItem(statusItem)
         }
         statusItem = nil
+    }
+}
+
+
+extension AppDelegate: NSWindowDelegate {
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        print("Window should close - returning true, app will continue running")
+        return true
+    }
+    
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window == mainWindow else { return }
+        
+        print("Statistics window closing - cleaning up and switching to accessory mode")
+        
+        // Clean up the window reference and switch back to accessory mode
+        DispatchQueue.main.async { [weak self] in
+            self?.mainWindow = nil
+            NSApp.setActivationPolicy(.accessory)
+            print("App switched back to accessory mode - should remain in menu bar")
+        }
     }
 }
 
@@ -343,18 +522,79 @@ extension AppDelegate: PomodoroTimerDelegate {
         }
     }
     
+    func sessionTypeDidChange(_ sessionType: SessionType) {
+        DispatchQueue.main.async {
+            self.updateMenuBarTitle()
+            self.setupMenu() // Refresh menu for new session type
+        }
+    }
+    
     func timerDidComplete() {
         DispatchQueue.main.async {
             self.updateMenuBarTitle()
             self.showCompletionNotification()
+            self.saveCompletedSession()
         }
     }
     
+    private func saveCompletedSession() {
+        guard let startTime = sessionStartTime,
+              let timer = pomodoroTimer,
+              let dataManager = dataManager else { return }
+        
+        // Get the current session type from timer
+        let sessionInfo = timer.getCurrentSessionInfo()
+        
+        // Save the completed session with correct type
+        dataManager.saveCurrentSession(
+            startTime: startTime,
+            duration: TimeInterval(timer.totalTime),
+            sessionType: sessionInfo.type,
+            isCompleted: true
+        )
+        
+        sessionStartTime = nil
+    }
+    
     private func showCompletionNotification() {
+        guard let settings = dataManager?.settings else { return }
+        
+        // Only show notification if enabled in settings
+        guard settings.notificationsEnabled else { return }
+        
         let content = UNMutableNotificationContent()
-        content.title = "🍅 Pomodoro Timer"
-        content.body = "Time's up! Take a break."
-        content.sound = .default
+        
+        // Customize notification based on session type and mode
+        if settings.fullPomodoroMode, let timer = pomodoroTimer {
+            let sessionInfo = timer.getCurrentSessionInfo()
+            
+            switch sessionInfo.type {
+            case .work:
+                content.title = "\u{1F345} Work Session Complete"  // 🍅 tomato
+                if sessionInfo.position >= sessionInfo.totalInCycle {
+                    content.body = "Great work! Time for a long break to recharge."
+                } else {
+                    content.body = "Nice work! Take a short break and come back refreshed."
+                }
+                
+            case .shortBreak:
+                content.title = "\u{2615} Break Over"  // ☕ coffee
+                content.body = "Ready to focus? Let's start work session \(sessionInfo.position)/\(sessionInfo.totalInCycle)."
+                
+            case .longBreak:
+                content.title = "\u{1F31F} Long Break Complete"  // 🌟 star
+                content.body = "Excellent! You've completed a full Pomodoro cycle. Ready for the next?"
+            }
+        } else {
+            // Simple work timer mode
+            content.title = "\u{1F345} Pomodoro Timer"  // 🍅 tomato
+            content.body = "Time's up! Take a break."
+        }
+        
+        // Only add sound if enabled in settings
+        if settings.soundEnabled {
+            content.sound = .default
+        }
         
         let request = UNNotificationRequest(identifier: "pomodoro-complete", content: content, trigger: nil)
         
@@ -363,5 +603,46 @@ extension AppDelegate: PomodoroTimerDelegate {
                 print("Notification error: \(error)")
             }
         }
+    }
+}
+
+extension AppDelegate: KeyboardShortcutManagerDelegate {
+    func keyboardShortcutTriggered(action: String) {
+        switch action {
+        case "startPause":
+            toggleStartPause()
+        case "reset":
+            resetTimer()
+        case "showStatistics":
+            showStatistics()
+        default:
+            break
+        }
+    }
+}
+
+// MARK: - Launch at Login Menu Target
+class LaunchAtLoginMenuTarget: NSObject {
+    weak var appDelegate: AppDelegate?
+    
+    init(appDelegate: AppDelegate) {
+        self.appDelegate = appDelegate
+        super.init()
+    }
+    
+    @objc func toggleLaunchAtLogin(_ sender: NSMenuItem) {
+        guard let appDelegate = appDelegate else { return }
+        
+        // Toggle the setting
+        if appDelegate.isLaunchAtLoginEnabled() {
+            appDelegate.disableLaunchAtLogin()
+        } else {
+            appDelegate.enableLaunchAtLogin()
+        }
+        
+        // Update the menu item state immediately
+        sender.state = appDelegate.isLaunchAtLoginEnabled() ? .on : .off
+        
+        // The menu will remain open because we're not calling any menu dismissal methods
     }
 }
