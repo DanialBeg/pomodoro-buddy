@@ -31,7 +31,6 @@ class KeyboardShortcutManager: ObservableObject {
     
     private func registerHotKey(_ shortcut: (action: String, modifiers: [String], key: String, isEnabled: Bool)) {
         guard let keyCode = keyCodeForString(shortcut.key) else {
-            print("Unable to find key code for key: \(shortcut.key)")
             return
         }
         
@@ -54,9 +53,7 @@ class KeyboardShortcutManager: ObservableObject {
         
         if status == noErr, let hotKey = hotKeyRef {
             registeredHotKeys.append(hotKey)
-            print("Registered hot key: \(formatShortcut(shortcut)) for \(shortcut.action)")
         } else {
-            print("Failed to register hot key: \(formatShortcut(shortcut)) (error: \(status))")
         }
     }
     

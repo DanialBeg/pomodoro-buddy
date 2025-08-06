@@ -76,14 +76,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // Never quit when last window closes - this is a menu bar app
-        print("App asked if should terminate after last window closed - returning false")
         NSApp.setActivationPolicy(.accessory) // Ensure we stay in accessory mode
         return false
     }
     
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Only allow termination if explicitly requested (via Quit menu)
-        print("App should terminate requested")
         return .terminateNow
     }
     
@@ -109,9 +107,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupNotifications() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if let error = error {
-                print("Notification permission error: \(error)")
-            }
+            _ = error
         }
     }
     
@@ -397,7 +393,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try SMAppService.mainApp.register()
         } catch {
-            print("Failed to enable launch at login: \(error)")
         }
     }
     
@@ -405,7 +400,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try SMAppService.mainApp.unregister()
         } catch {
-            print("Failed to disable launch at login: \(error)")
         }
     }
     
@@ -443,7 +437,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Handle window closing
         mainWindow?.delegate = self
         
-        print("Created main window with delegate set to AppDelegate")
     }
     
     @objc private func settingsDidChange(_ notification: Notification) {
@@ -493,7 +486,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        print("Window should close - returning true, app will continue running")
         return true
     }
     
@@ -501,13 +493,11 @@ extension AppDelegate: NSWindowDelegate {
         guard let window = notification.object as? NSWindow,
               window == mainWindow else { return }
         
-        print("Statistics window closing - cleaning up and switching to accessory mode")
         
         // Clean up the window reference and switch back to accessory mode
         DispatchQueue.main.async { [weak self] in
             self?.mainWindow = nil
             NSApp.setActivationPolicy(.accessory)
-            print("App switched back to accessory mode - should remain in menu bar")
         }
     }
 }
@@ -602,9 +592,7 @@ extension AppDelegate: PomodoroTimerDelegate {
         let request = UNNotificationRequest(identifier: "pomodoro-complete", content: content, trigger: nil)
         
         UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("Notification error: \(error)")
-            }
+            _ = error
         }
     }
 }
