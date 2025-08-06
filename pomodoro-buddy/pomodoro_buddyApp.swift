@@ -194,17 +194,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(sliderItem)
         menu.addItem(NSMenuItem.separator())
         
-        let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: nil, keyEquivalent: "")
-        launchAtLoginItem.state = isLaunchAtLoginEnabled() ? .on : .off
-        
-        // Create a custom target that handles the toggle without menu dismissal
-        let target = LaunchAtLoginMenuTarget(appDelegate: self)
-        launchAtLoginItem.target = target
-        launchAtLoginItem.action = #selector(LaunchAtLoginMenuTarget.toggleLaunchAtLogin)
-        
-        // Store the target to prevent deallocation
-        launchAtLoginItem.representedObject = target
-        
+        // Create custom view for Launch at Login to prevent menu auto-close
+        let launchAtLoginItem = createLaunchAtLoginItem()
         menu.addItem(launchAtLoginItem)
         
         menu.addItem(NSMenuItem.separator())
@@ -261,6 +252,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menuItem.view = containerView
         return menuItem
+    }
+    
+    private func createLaunchAtLoginItem() -> NSMenuItem {
+        let menuItem = NSMenuItem()
+        menuItem.title = ""
+        
+        // Create container view
+        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 30))
+        
+        // Create checkbox button
+        let checkbox = NSButton(frame: NSRect(x: 15, y: 5, width: 220, height: 20))
+        checkbox.setButtonType(.switch)
+        checkbox.title = "Launch at Login"
+        checkbox.state = isLaunchAtLoginEnabled() ? .on : .off
+        checkbox.target = self
+        checkbox.action = #selector(launchAtLoginCheckboxToggled(_:))
+        
+        containerView.addSubview(checkbox)
+        menuItem.view = containerView
+        
+        return menuItem
+    }
+    
+    @objc private func launchAtLoginCheckboxToggled(_ sender: NSButton) {
+        if sender.state == .on {
+            enableLaunchAtLogin()
+        } else {
+            disableLaunchAtLogin()
+        }
+        
+        // Update checkbox state to reflect actual system state
+        sender.state = isLaunchAtLoginEnabled() ? .on : .off
     }
     
     private func addTickMarks(to containerView: NSView, sliderFrame: NSRect) {
@@ -364,26 +387,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    @objc private func toggleLaunchAtLogin() {
-        if isLaunchAtLoginEnabled() {
-            disableLaunchAtLogin()
-        } else {
-            enableLaunchAtLogin()
-        }
-        updateLaunchAtLoginMenuItem() // Update just the checkmark without closing menu
-    }
-    
-    private func updateLaunchAtLoginMenuItem() {
-        guard let menu = statusItem?.menu else { return }
-        
-        // Find the Launch at Login menu item and update its state
-        for item in menu.items {
-            if item.title == "Launch at Login" {
-                item.state = isLaunchAtLoginEnabled() ? .on : .off
-                break
-            }
-        }
-    }
     
     func isLaunchAtLoginEnabled() -> Bool {
         guard Bundle.main.bundleIdentifier != nil else { return false }
@@ -621,28 +624,3 @@ extension AppDelegate: KeyboardShortcutManagerDelegate {
     }
 }
 
-// MARK: - Launch at Login Menu Target
-class LaunchAtLoginMenuTarget: NSObject {
-    weak var appDelegate: AppDelegate?
-    
-    init(appDelegate: AppDelegate) {
-        self.appDelegate = appDelegate
-        super.init()
-    }
-    
-    @objc func toggleLaunchAtLogin(_ sender: NSMenuItem) {
-        guard let appDelegate = appDelegate else { return }
-        
-        // Toggle the setting
-        if appDelegate.isLaunchAtLoginEnabled() {
-            appDelegate.disableLaunchAtLogin()
-        } else {
-            appDelegate.enableLaunchAtLogin()
-        }
-        
-        // Update the menu item state immediately
-        sender.state = appDelegate.isLaunchAtLoginEnabled() ? .on : .off
-        
-        // The menu will remain open because we're not calling any menu dismissal methods
-    }
-}
