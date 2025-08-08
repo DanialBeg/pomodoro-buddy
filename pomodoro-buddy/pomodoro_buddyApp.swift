@@ -14,19 +14,35 @@ import ServiceManagement
 struct pomodoro_buddyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @AppStorage("launchAtLogin") private var launchAtLogin = false
+    @StateObject private var sharedDataManager = SessionDataManager()
     
     var body: some Scene {
         Settings {
-            EmptyView()
+            PreferencesView(dataManager: AppDelegate.sharedDataManager ?? sharedDataManager)
+                .frame(minWidth: 500, minHeight: 400)
+                .onAppear {
+                    // Ensure we use the same data manager instance
+                    if AppDelegate.sharedDataManager == nil {
+                        AppDelegate.sharedDataManager = sharedDataManager
+                    } else {
+                        // Sync our local data manager with the shared one
+                        sharedDataManager.settings = AppDelegate.sharedDataManager!.settings
+                        sharedDataManager.sessions = AppDelegate.sharedDataManager!.sessions
+                    }
+                }
         }
     }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    static var sharedDataManager: SessionDataManager?
+    
     var statusItem: NSStatusItem?
     var pomodoroTimer: PomodoroTimer?
     var mainWindow: NSWindow?
-    var dataManager: SessionDataManager?
+    var dataManager: SessionDataManager? {
+        return AppDelegate.sharedDataManager
+    }
     var sessionStartTime: Date?
     var keyboardShortcutManager: KeyboardShortcutManager?
     
@@ -36,7 +52,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Set up app delegate to handle window closing properly
         NSApp.delegate = self
         
-        dataManager = SessionDataManager()
+        // Initialize shared data manager if not already done
+        if AppDelegate.sharedDataManager == nil {
+            AppDelegate.sharedDataManager = SessionDataManager()
+        }
+        
         setupMenuBar()
         setupNotifications()
         setupLaunchAtLogin()
@@ -86,10 +106,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupLaunchAtLogin() {
-        // Enable launch at login by default if not already configured
-        if !isLaunchAtLoginEnabled() {
-            enableLaunchAtLogin()
-        }
+        // Launch at login is now controlled by user preference only
+        // No automatic enabling without user consent
     }
     
     private func setupMenuBar() {
