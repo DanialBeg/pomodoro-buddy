@@ -1,40 +1,141 @@
 import SwiftUI
+import AppKit
 
 struct MainWindow: View {
     @State private var selectedTab: MainWindowTab = .statistics
     @EnvironmentObject var dataManager: SessionDataManager
     
     var body: some View {
-        NavigationSplitView {
-            // Sidebar
-            List(MainWindowTab.allCases, id: \.self, selection: $selectedTab) { tab in
-                Label(tab.title, systemImage: tab.systemImage)
-                    .tag(tab)
-            }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 200, max: 250)
-        } detail: {
-            // Main content area
-            Group {
-                switch selectedTab {
-                case .statistics:
-                    StatisticsView(dataManager: dataManager)
-                case .preferences:
-                    PreferencesView(dataManager: dataManager)
-                case .history:
-                    HistoryView(dataManager: dataManager)
-                case .shortcuts:
-                    KeyboardShortcutsView(dataManager: dataManager)
+        HStack(spacing: 0) {
+            // Modern Sidebar
+            VStack(alignment: .leading, spacing: 0) {
+                // Sidebar Header
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Pomodoro Buddy")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Focus & Productivity")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+                .padding(.bottom, 24)
+                
+                // Navigation Items
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(MainWindowTab.allCases, id: \.self) { tab in
+                        HStack(spacing: 12) {
+                            // Icon with background circle
+                            ZStack {
+                                Circle()
+                                    .fill(selectedTab == tab ? Color.accentColor : Color.gray.opacity(0.15))
+                                    .frame(width: 32, height: 32)
+                                
+                                Image(systemName: tab.systemImage)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(selectedTab == tab ? .white : .primary)
+                            }
+                            
+                            Text(tab.title)
+                                .font(.system(size: 14, weight: selectedTab == tab ? .semibold : .medium))
+                                .foregroundColor(selectedTab == tab ? .primary : .secondary)
+                            
+                            Spacer()
+                            
+                            // Selection indicator
+                            if selectedTab == tab {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(Color.accentColor)
+                                    .frame(width: 3, height: 16)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(selectedTab == tab ? Color.accentColor.opacity(0.08) : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedTab = tab
+                        }
+                        .padding(.horizontal, 8)
+                    }
+                }
+                
+                Spacer()
+                
+                // Footer
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                        .padding(.horizontal, 16)
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Stay Focused")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Text("Build better habits")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Text("🍅")
+                            .font(.title3)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
                 }
             }
-            .navigationTitle(selectedTab.title)
-            .navigationSplitViewColumnWidth(min: 400, ideal: 500, max: 600)
+            .frame(minWidth: 220, idealWidth: 240, maxWidth: 260)
+            .background(
+                RoundedRectangle(cornerRadius: 0)
+                    .fill(Color(.controlBackgroundColor).opacity(0.5))
+            )
+            
+            Divider()
+            
+            // Main content area
+            VStack {
+                HStack {
+                    Text(selectedTab.title)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    Spacer()
+                }
+                .padding()
+                
+                destinationView(for: selectedTab)
+            }
+            .frame(minWidth: 400, idealWidth: 500, maxWidth: 600)
         }
         .frame(minWidth: 650, minHeight: 500)
+    }
+    
+    @ViewBuilder
+    private func destinationView(for tab: MainWindowTab) -> some View {
+        switch tab {
+        case .statistics:
+            StatisticsView(dataManager: dataManager)
+        case .goals:
+            GoalsView(dataManager: dataManager)
+        case .preferences:
+            PreferencesView(dataManager: dataManager)
+        case .history:
+            HistoryView(dataManager: dataManager)
+        case .shortcuts:
+            KeyboardShortcutsView(dataManager: dataManager)
+        }
     }
 }
 
 enum MainWindowTab: String, CaseIterable {
     case statistics = "Statistics"
+    case goals = "Goals"
     case preferences = "Preferences" 
     case history = "History"
     case shortcuts = "Shortcuts"
@@ -47,6 +148,8 @@ enum MainWindowTab: String, CaseIterable {
         switch self {
         case .statistics:
             return "chart.bar.fill"
+        case .goals:
+            return "target"
         case .preferences:
             return "gearshape.fill"
         case .history:
@@ -65,7 +168,10 @@ struct StatisticsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Today's Stats
-                GroupBox("Today") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Today")
+                        .font(.headline)
+                        .padding(.bottom, 4)
                     VStack(alignment: .leading, spacing: 12) {
                         let todaysStats = dataManager.getTodaysStats()
                         let goalProgress = dataManager.getDailyGoalProgress()
@@ -94,19 +200,26 @@ struct StatisticsView: View {
                             Text("Daily Goal Progress (\(goalProgress.completed)/\(goalProgress.goal))")
                                 .font(.caption)
                         }
-                        .progressViewStyle(LinearProgressViewStyle(tint: .accentColor))
+                        .progressViewStyle(LinearProgressViewStyle())
                     }
                     .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
                 }
                 
-                // Weekly Stats
-                GroupBox("This Week") {
-                    VStack(alignment: .leading, spacing: 12) {
+                // Weekly Breakdown
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Weekly Session Breakdown")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+                    VStack(alignment: .leading, spacing: 16) {
+                        let weeklyBreakdown = dataManager.getWeeklySessionBreakdown()
                         let weeklyStats = dataManager.getWeeklyStats()
                         
+                        // Summary row
                         HStack {
                             VStack(alignment: .leading) {
-                                Text("Total Pomodoros")
+                                Text("Total This Week")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 Text("\(weeklyStats.totalPomodoros)")
@@ -123,27 +236,189 @@ struct StatisticsView: View {
                                     .fontWeight(.semibold)
                             }
                         }
+                        .padding(.bottom, 8)
+                        
+                        // Weekly grid
+                        VStack(spacing: 8) {
+                            ForEach(weeklyBreakdown, id: \.date) { dayData in
+                                WeeklyDayRow(dayData: dayData, dataManager: dataManager)
+                            }
+                        }
                         
                         if weeklyStats.streak > 0 {
-                            Text("\u{1F525} \(weeklyStats.streak) day streak")  // 🔥 fire
-                                .font(.subheadline)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.orange.opacity(0.2))
-                                .cornerRadius(8)
-                        } else {
-                            Text("Start your streak today!")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            HStack {
+                                Spacer()
+                                Text("\u{1F525} \(weeklyStats.streak) day streak")  // 🔥 fire
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.orange.opacity(0.2))
+                                    .cornerRadius(8)
+                                Spacer()
+                            }
+                            .padding(.top, 8)
                         }
                     }
                     .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                // Legend
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Legend")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+                    HStack(spacing: 20) {
+                        // Work session
+                        HStack(spacing: 4) {
+                            Text("\u{1F345}")  // 🍅
+                                .font(.system(size: 14))
+                            Text("Work Sessions")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // Short break
+                        HStack(spacing: 4) {
+                            Text("\u{2615}")  // ☕
+                                .font(.system(size: 14))
+                            Text("Short Breaks")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // Long break
+                        HStack(spacing: 4) {
+                            Text("\u{1F31F}")  // 🌟
+                                .font(.system(size: 14))
+                            Text("Long Breaks")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
                 }
                 
                 Spacer()
             }
             .padding()
         }
+    }
+}
+
+
+struct WeeklyDayRow: View {
+    let dayData: SessionDataManager.DailySessionBreakdown
+    let dataManager: SessionDataManager
+    
+    var body: some View {
+        HStack {
+            // Day name
+            VStack(alignment: .leading) {
+                Text(dayData.dayName)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(dayData.isToday ? .accentColor : .primary)
+                if dayData.isToday {
+                    Text("Today")
+                        .font(.system(size: 9))
+                        .foregroundColor(.accentColor)
+                        .padding(.top, -2)
+                }
+            }
+            .frame(width: 45, alignment: .leading)
+            
+            Spacer()
+            
+            // Session indicators
+            HStack(spacing: 4) {
+                // Work sessions (tomatoes)
+                if dayData.workSessions > 0 {
+                    HStack(spacing: 2) {
+                        Text("\u{1F345}")  // 🍅
+                            .font(.system(size: 12))
+                        Text("\(dayData.workSessions)")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                } else {
+                    HStack(spacing: 2) {
+                        Text("\u{1F345}")  // 🍅
+                            .font(.system(size: 12))
+                            .opacity(0.3)
+                        Text("0")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Text("•")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
+                
+                // Short breaks
+                if dayData.shortBreaks > 0 {
+                    HStack(spacing: 2) {
+                        Text("\u{2615}")  // ☕
+                            .font(.system(size: 12))
+                        Text("\(dayData.shortBreaks)")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                } else {
+                    HStack(spacing: 2) {
+                        Text("\u{2615}")  // ☕
+                            .font(.system(size: 12))
+                            .opacity(0.3)
+                        Text("0")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Text("•")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
+                
+                // Long breaks
+                if dayData.longBreaks > 0 {
+                    HStack(spacing: 2) {
+                        Text("\u{1F31F}")  // 🌟
+                            .font(.system(size: 12))
+                        Text("\(dayData.longBreaks)")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                } else {
+                    HStack(spacing: 2) {
+                        Text("\u{1F31F}")  // 🌟
+                            .font(.system(size: 12))
+                            .opacity(0.3)
+                        Text("0")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Total focus time
+            VStack(alignment: .trailing) {
+                Text(dataManager.formatDuration(dayData.totalFocusTime))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(dayData.totalFocusTime > 0 ? .primary : .secondary)
+            }
+            .frame(width: 50, alignment: .trailing)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(dayData.isToday ? Color.accentColor.opacity(0.1) : Color.clear)
+        )
     }
 }
 
@@ -405,6 +680,279 @@ struct KeyboardShortcutsView: View {
             Spacer()
         }
         .padding()
+    }
+}
+
+
+struct GoalsView: View {
+    @ObservedObject var dataManager: SessionDataManager
+    @State private var showingGoalEditor = false
+    @State private var newGoalText = ""
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Current Goal Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Daily Goal")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Current Target")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            HStack(spacing: 8) {
+                                let dailyGoal = dataManager.getDailyGoal()
+                                Text("\(dailyGoal > 0 ? dailyGoal : 8)")
+                                    .font(.largeTitle)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.accentColor)
+                                Text("🍅 per day")
+                                    .font(.title2)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Button("Edit Goal") {
+                            let currentGoal = dataManager.getDailyGoal()
+                            newGoalText = currentGoal > 0 ? String(currentGoal) : "8"
+                            showingGoalEditor = true
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                }
+                .padding(16)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(12)
+                
+                // Today's Progress
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Today's Progress")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+                    
+                    let goalProgress = dataManager.getDailyGoalProgress()
+                    let todaysStats = dataManager.getTodaysStats()
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Completed: \(goalProgress.completed) / \(goalProgress.goal)")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text("\(Int(goalProgress.progress * 100))%")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.accentColor)
+                        }
+                        
+                        ProgressView(value: goalProgress.progress)
+                            .progressViewStyle(LinearProgressViewStyle())
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Focus Time")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(dataManager.formatDuration(todaysStats.totalFocusTime))
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            
+                            Spacer()
+                            
+                            if goalProgress.completed >= goalProgress.goal {
+                                Text("🎉 Goal Achieved!")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.green)
+                            } else {
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text("Remaining")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("\(goalProgress.goal - goalProgress.completed) sessions")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(12)
+                
+                // Tips Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Goal Setting Tips")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("💡")
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Start Small")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("Begin with 4-6 pomodoros daily")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("📅")
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Be Consistent")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("Daily practice beats long sessions")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("💪")
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Gradual Increase")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("Add 1-2 sessions weekly as you improve")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(12)
+                
+                Spacer()
+            }
+            .padding()
+        }
+        .sheet(isPresented: $showingGoalEditor) {
+            VStack(spacing: 24) {
+                Text("Set Daily Goal")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                VStack(spacing: 16) {
+                    Text("How many pomodoros do you want to complete each day?")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    VStack(spacing: 12) {
+                        Text("Select your daily goal:")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 16) {
+                            Button(action: {
+                                if let currentGoal = Int(newGoalText), currentGoal > 1 {
+                                    newGoalText = String(currentGoal - 1)
+                                }
+                            }) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.2))
+                                        .frame(width: 40, height: 40)
+                                    
+                                    Text("-")
+                                        .font(.title2)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.primary)
+                                }
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .contentShape(Circle())
+                            .disabled(Int(newGoalText) == nil || Int(newGoalText)! <= 1)
+                            
+                            Text(newGoalText)
+                                .font(.title)
+                                .fontWeight(.semibold)
+                                .frame(minWidth: 80)
+                                .foregroundColor(.accentColor)
+                            
+                            Button(action: {
+                                if let currentGoal = Int(newGoalText), currentGoal < 20 {
+                                    newGoalText = String(currentGoal + 1)
+                                } else if Int(newGoalText) == nil {
+                                    newGoalText = "8"
+                                }
+                            }) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.2))
+                                        .frame(width: 40, height: 40)
+                                    
+                                    Text("+")
+                                        .font(.title2)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.primary)
+                                }
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .contentShape(Circle())
+                            .disabled(Int(newGoalText) != nil && Int(newGoalText)! >= 20)
+                        }
+                        
+                        Text("pomodoros per day")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+                
+                HStack(spacing: 16) {
+                    Button("Cancel") {
+                        showingGoalEditor = false
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Color.gray.opacity(0.2))
+                    .foregroundColor(.primary)
+                    .cornerRadius(8)
+                    
+                    Button("Save") {
+                        if let goalValue = Int(newGoalText), goalValue > 0 {
+                            dataManager.updateDailyGoal(goalValue)
+                            showingGoalEditor = false
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    .disabled(Int(newGoalText) == nil || Int(newGoalText)! <= 0)
+                }
+                
+                Spacer()
+            }
+            .padding(24)
+            .frame(width: 450, height: 300)
+        }
     }
 }
 

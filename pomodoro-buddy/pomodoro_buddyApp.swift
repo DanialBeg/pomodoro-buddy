@@ -403,21 +403,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     
     func isLaunchAtLoginEnabled() -> Bool {
-        guard Bundle.main.bundleIdentifier != nil else { return false }
-        return SMAppService.mainApp.status == .enabled
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return false }
+        
+        // Use legacy API for Big Sur compatibility
+        if #available(macOS 13.0, *) {
+            return SMAppService.mainApp.status == .enabled
+        } else {
+            // For macOS 11.0-12.x, use the legacy method
+            let jobDicts = SMCopyAllJobDictionaries(kSMDomainUserLaunchd)?.takeRetainedValue() as? [[String: Any]] ?? []
+            return jobDicts.contains { dict in
+                guard let program = dict["Program"] as? String,
+                      let programArguments = dict["ProgramArguments"] as? [String] else { return false }
+                return program.hasSuffix(bundleIdentifier) || programArguments.contains { $0.hasSuffix(bundleIdentifier) }
+            }
+        }
     }
     
     func enableLaunchAtLogin() {
-        do {
-            try SMAppService.mainApp.register()
-        } catch {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        
+        if #available(macOS 13.0, *) {
+            do {
+                try SMAppService.mainApp.register()
+            } catch {
+                print("Failed to enable launch at login: \(error)")
+            }
+        } else {
+            // Legacy API for Big Sur/Monterey
+            _ = SMLoginItemSetEnabled(bundleIdentifier as CFString, true)
         }
     }
     
     func disableLaunchAtLogin() {
-        do {
-            try SMAppService.mainApp.unregister()
-        } catch {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        
+        if #available(macOS 13.0, *) {
+            do {
+                try SMAppService.mainApp.unregister()
+            } catch {
+                print("Failed to disable launch at login: \(error)")
+            }
+        } else {
+            // Legacy API for Big Sur/Monterey
+            _ = SMLoginItemSetEnabled(bundleIdentifier as CFString, false)
         }
     }
     
