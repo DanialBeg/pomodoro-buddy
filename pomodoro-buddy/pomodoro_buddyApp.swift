@@ -124,7 +124,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupNotifications() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             _ = error
         }
     }

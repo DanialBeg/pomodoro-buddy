@@ -37,14 +37,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		43FAE8792E19B10F00620553 /* pomodoro-buddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "pomodoro-buddy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		43FAE8792E19B10F00620553 /* Pomodoro Buddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Pomodoro Buddy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		43FAE87C2E19B10F00620553 /* pomodoro_buddyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = pomodoro_buddyApp.swift; sourceTree = "<group>"; };
 		43FAE8802E19B11000620553 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		43FAE8832E19B11000620553 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		43FAE8852E19B11000620553 /* pomodoro_buddy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = pomodoro_buddy.entitlements; sourceTree = "<group>"; };
-		43FAE88A2E19B11100620553 /* pomodoro-buddyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "pomodoro-buddyTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		43FAE88A2E19B11100620553 /* pomodoro-buddyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = "pomodoro-buddyTests.xctest"; path = "Pomodoro Buddy.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		43FAE88E2E19B11100620553 /* pomodoro_buddyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = pomodoro_buddyTests.swift; sourceTree = "<group>"; };
-		43FAE8942E19B11100620553 /* pomodoro-buddyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "pomodoro-buddyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		43FAE8942E19B11100620553 /* pomodoro-buddyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = "pomodoro-buddyUITests.xctest"; path = "Pomodoro Buddy.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		43FAE8982E19B11100620553 /* pomodoro_buddyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = pomodoro_buddyUITests.swift; sourceTree = "<group>"; };
 		43FAE89A2E19B11100620553 /* pomodoro_buddyUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = pomodoro_buddyUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		43FAE8A72E19B21000620553 /* PomodoroTimer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PomodoroTimer.swift; sourceTree = "<group>"; };
@@ -91,7 +91,7 @@
 		43FAE87A2E19B10F00620553 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				43FAE8792E19B10F00620553 /* pomodoro-buddy.app */,
+				43FAE8792E19B10F00620553 /* Pomodoro Buddy.app */,
 				43FAE88A2E19B11100620553 /* pomodoro-buddyTests.xctest */,
 				43FAE8942E19B11100620553 /* pomodoro-buddyUITests.xctest */,
 			);
@@ -155,7 +155,7 @@
 			);
 			name = "pomodoro-buddy";
 			productName = "pomodoro-buddy";
-			productReference = 43FAE8792E19B10F00620553 /* pomodoro-buddy.app */;
+			productReference = 43FAE8792E19B10F00620553 /* Pomodoro Buddy.app */;
 			productType = "com.apple.product-type.application";
 		};
 		43FAE8892E19B11100620553 /* pomodoro-buddyTests */ = {
@@ -451,7 +451,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.danialbeg.pomodoro-buddy";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Pomodoro Buddy";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -481,7 +481,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.danialbeg.pomodoro-buddy";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Pomodoro Buddy";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -499,7 +499,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.1;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "danial.pomodoro-buddyTests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Pomodoro Buddy";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/pomodoro-buddy.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/pomodoro-buddy";
@@ -518,7 +518,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.1;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "danial.pomodoro-buddyTests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Pomodoro Buddy";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/pomodoro-buddy.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/pomodoro-buddy";
@@ -535,7 +535,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "danial.pomodoro-buddyUITests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Pomodoro Buddy";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = "pomodoro-buddy";
@@ -552,7 +552,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "danial.pomodoro-buddyUITests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Pomodoro Buddy";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = "pomodoro-buddy";

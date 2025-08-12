@@ -247,14 +247,16 @@ class SessionDataManager: ObservableObject {
     
     func getSessionHistory() -> [(date: Date, sessions: [PomodoroSession])] {
         let calendar = Calendar.current
-        let groupedSessions = Dictionary(grouping: sessions.filter { $0.isCompleted }) { session in
+        let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        
+        let groupedSessions = Dictionary(grouping: sessions.filter { session in
+            session.isCompleted && session.startTime >= oneWeekAgo
+        }) { session in
             calendar.startOfDay(for: session.startTime)
         }
         
         return groupedSessions.map { (date: $0.key, sessions: $0.value) }
             .sorted { $0.date > $1.date }
-            .prefix(30)
-            .map { $0 }
     }
     
     private func calculateStreak() -> Int {
