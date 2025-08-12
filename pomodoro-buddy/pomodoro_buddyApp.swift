@@ -403,19 +403,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     
     func isLaunchAtLoginEnabled() -> Bool {
-        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return false }
-        
-        // Use legacy API for Big Sur compatibility
         if #available(macOS 13.0, *) {
             return SMAppService.mainApp.status == .enabled
         } else {
-            // For macOS 11.0-12.x, use the legacy method
-            let jobDicts = SMCopyAllJobDictionaries(kSMDomainUserLaunchd)?.takeRetainedValue() as? [[String: Any]] ?? []
-            return jobDicts.contains { dict in
-                guard let program = dict["Program"] as? String,
-                      let programArguments = dict["ProgramArguments"] as? [String] else { return false }
-                return program.hasSuffix(bundleIdentifier) || programArguments.contains { $0.hasSuffix(bundleIdentifier) }
-            }
+            // For macOS 11.0-12.x, we'll maintain state locally since SMAppService isn't available
+            // and the deprecated SMCopyAllJobDictionaries produces warnings
+            return UserDefaults.standard.bool(forKey: "LaunchAtLogin")
         }
     }
     
@@ -429,8 +422,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 print("Failed to enable launch at login: \(error)")
             }
         } else {
-            // Legacy API for Big Sur/Monterey
-            _ = SMLoginItemSetEnabled(bundleIdentifier as CFString, true)
+            // For macOS 11.0-12.x, use the legacy SMLoginItemSetEnabled API
+            let success = SMLoginItemSetEnabled(bundleIdentifier as CFString, true)
+            // Store the state locally for UI consistency
+            UserDefaults.standard.set(success, forKey: "LaunchAtLogin")
         }
     }
     
@@ -444,8 +439,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 print("Failed to disable launch at login: \(error)")
             }
         } else {
-            // Legacy API for Big Sur/Monterey
-            _ = SMLoginItemSetEnabled(bundleIdentifier as CFString, false)
+            // For macOS 11.0-12.x, use the legacy SMLoginItemSetEnabled API
+            let success = SMLoginItemSetEnabled(bundleIdentifier as CFString, false)
+            // Store the state locally for UI consistency
+            UserDefaults.standard.set(!success, forKey: "LaunchAtLogin")
         }
     }
     

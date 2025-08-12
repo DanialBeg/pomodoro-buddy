@@ -196,9 +196,10 @@ struct StatisticsView: View {
                             }
                         }
                         
-                        ProgressView(value: goalProgress.progress) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text("Daily Goal Progress (\(goalProgress.completed)/\(goalProgress.goal))")
                                 .font(.caption)
+                            ProgressView(value: goalProgress.progress)
                         }
                         .progressViewStyle(LinearProgressViewStyle())
                     }
@@ -434,59 +435,92 @@ struct PreferencesView: View {
     @State private var fullPomodoroMode: Bool = false
     
     var body: some View {
-        Form {
-            Section("Timer Mode") {
-                Toggle("Full Pomodoro Timer", isOn: $fullPomodoroMode)
-                Text(fullPomodoroMode ? 
-                     "Automatic work-break cycles with short and long breaks" : 
-                     "Simple work timer only")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Section("Timer Settings") {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading) {
-                        Text("Work Duration: \(Int(workDuration)) minutes")
-                            .font(.headline)
-                        Slider(value: $workDuration, in: 10...90, step: 5)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Timer Mode Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Timer Mode")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("Full Pomodoro Timer", isOn: $fullPomodoroMode)
+                        Text(fullPomodoroMode ? 
+                             "Automatic work-break cycles with short and long breaks" : 
+                             "Simple work timer only")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                    
-                    if fullPomodoroMode {
-                        VStack(alignment: .leading) {
-                            Text("Short Break: \(Int(shortBreakDuration)) minutes")
-                                .font(.headline)
-                            Slider(value: $shortBreakDuration, in: 1...15, step: 1)
-                        }
-                        
-                        VStack(alignment: .leading) {
-                            Text("Long Break: \(Int(longBreakDuration)) minutes")
-                                .font(.headline)
-                            Slider(value: $longBreakDuration, in: 10...45, step: 5)
-                        }
-                        
-                        VStack(alignment: .leading) {
-                            Text("Long Break Every: \(Int(longBreakInterval)) pomodoros")
-                                .font(.headline)
-                            Slider(value: $longBreakInterval, in: 2...8, step: 1)
-                        }
-                    }
-                    
-                    VStack(alignment: .leading) {
-                        Text("Daily Goal: \(Int(dailyGoal)) pomodoros")
-                            .font(.headline)
-                        Slider(value: $dailyGoal, in: 1...20, step: 1)
-                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
                 }
+                
+                // Timer Settings Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Timer Settings")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+                    VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading) {
+                            Text("Work Duration: \(Int(workDuration)) minutes")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Slider(value: $workDuration, in: 10...90, step: 5)
+                        }
+                        
+                        if fullPomodoroMode {
+                            VStack(alignment: .leading) {
+                                Text("Short Break: \(Int(shortBreakDuration)) minutes")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Slider(value: $shortBreakDuration, in: 1...15, step: 1)
+                            }
+                            
+                            VStack(alignment: .leading) {
+                                Text("Long Break: \(Int(longBreakDuration)) minutes")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Slider(value: $longBreakDuration, in: 10...45, step: 5)
+                            }
+                            
+                            VStack(alignment: .leading) {
+                                Text("Long Break Every: \(Int(longBreakInterval)) pomodoros")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Slider(value: $longBreakInterval, in: 2...8, step: 1)
+                            }
+                        }
+                        
+                        VStack(alignment: .leading) {
+                            Text("Daily Goal: \(Int(dailyGoal)) pomodoros")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Slider(value: $dailyGoal, in: 1...20, step: 1)
+                        }
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                // Notifications Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Notifications")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("Enable Sound", isOn: $soundEnabled)
+                        Toggle("Enable Notifications", isOn: $notificationsEnabled)
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                Spacer()
             }
-            
-            Section("Notifications") {
-                Toggle("Enable Sound", isOn: $soundEnabled)
-                Toggle("Enable Notifications", isOn: $notificationsEnabled)
-            }
+            .padding()
         }
-        .formStyle(.grouped)
-        .padding()
         .onAppear {
             // Load current settings
             workDuration = Double(dataManager.settings.workDuration)
@@ -498,14 +532,14 @@ struct PreferencesView: View {
             dailyGoal = Double(dataManager.settings.dailyGoal)
             fullPomodoroMode = dataManager.settings.fullPomodoroMode
         }
-        .onChange(of: workDuration) { saveSettings() }
-        .onChange(of: shortBreakDuration) { saveSettings() }
-        .onChange(of: longBreakDuration) { saveSettings() }
-        .onChange(of: longBreakInterval) { saveSettings() }
-        .onChange(of: soundEnabled) { saveSettings() }
-        .onChange(of: notificationsEnabled) { saveSettings() }
-        .onChange(of: dailyGoal) { saveSettings() }
-        .onChange(of: fullPomodoroMode) { saveSettings() }
+        .onChange(of: workDuration) { _ in saveSettings() }
+        .onChange(of: shortBreakDuration) { _ in saveSettings() }
+        .onChange(of: longBreakDuration) { _ in saveSettings() }
+        .onChange(of: longBreakInterval) { _ in saveSettings() }
+        .onChange(of: soundEnabled) { _ in saveSettings() }
+        .onChange(of: notificationsEnabled) { _ in saveSettings() }
+        .onChange(of: dailyGoal) { _ in saveSettings() }
+        .onChange(of: fullPomodoroMode) { _ in saveSettings() }
     }
     
     private func saveSettings() {
@@ -581,105 +615,121 @@ struct KeyboardShortcutsView: View {
     @ObservedObject var dataManager: SessionDataManager
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Keyboard Shortcuts")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-            
-            Text("Configure global keyboard shortcuts to control Pomodoro Buddy from anywhere on your system.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            VStack(spacing: 16) {
-                // Start/Pause shortcut
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Start/Pause Timer")
-                            .font(.headline)
-                        Text("Global shortcut for start/pause timer")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("⌘⇧P")
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(6)
-                        .font(.system(size: 13, design: .monospaced))
-                }
-                .padding()
-                .background(Color.gray.opacity(0.05))
-                .cornerRadius(8)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Keyboard Shortcuts")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
                 
-                // Reset shortcut
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Reset Timer")
-                            .font(.headline)
-                        Text("Global shortcut for reset timer")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("⌘⇧R")
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(6)
-                        .font(.system(size: 13, design: .monospaced))
-                }
-                .padding()
-                .background(Color.gray.opacity(0.05))
-                .cornerRadius(8)
+                Text("Configure global keyboard shortcuts to control Pomodoro Buddy from anywhere on your system.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 
-                // Statistics shortcut
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Show Statistics")
-                            .font(.headline)
-                        Text("Global shortcut for show statistics")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                VStack(spacing: 16) {
+                    // Start/Pause shortcut
+                    VStack(spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Start/Pause Timer")
+                                    .font(.headline)
+                                Text("Global shortcut for start/pause timer")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            
+                            Spacer()
+                            
+                            Text("⌘⇧P")
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(6)
+                                .font(.system(size: 13, design: .monospaced))
+                        }
                     }
+                    .padding()
+                    .background(Color.gray.opacity(0.05))
+                    .cornerRadius(8)
                     
-                    Spacer()
+                    // Reset shortcut
+                    VStack(spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Reset Timer")
+                                    .font(.headline)
+                                Text("Global shortcut for reset timer")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            
+                            Spacer()
+                            
+                            Text("⌘⇧R")
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(6)
+                                .font(.system(size: 13, design: .monospaced))
+                        }
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.05))
+                    .cornerRadius(8)
                     
-                    Text("⌘⇧S")
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(6)
-                        .font(.system(size: 13, design: .monospaced))
+                    // Statistics shortcut
+                    VStack(spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Show Statistics")
+                                    .font(.headline)
+                                Text("Global shortcut for show statistics")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            
+                            Spacer()
+                            
+                            Text("⌘⇧S")
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(6)
+                                .font(.system(size: 13, design: .monospaced))
+                        }
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.05))
+                    .cornerRadius(8)
                 }
-                .padding()
-                .background(Color.gray.opacity(0.05))
-                .cornerRadius(8)
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tips:")
+                        .font(.headline)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• Shortcuts work globally when the app is running")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• Use ⌘ (Command) key combinations for system-wide access")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• These shortcuts work even when the app is minimized")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• Avoid common shortcuts like ⌘C, ⌘V to prevent conflicts")
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+                
+                Spacer()
             }
-            
-            Divider()
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Tips:")
-                    .font(.headline)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("• Shortcuts work globally when the app is running")
-                    Text("• Use ⌘ (Command) key combinations for system-wide access")
-                    Text("• These shortcuts work even when the app is minimized")
-                    Text("• Avoid common shortcuts like ⌘C, ⌘V to prevent conflicts")
-                }
-                .font(.caption)
-                .foregroundColor(.secondary)
-            }
-            
-            Spacer()
+            .padding()
         }
-        .padding()
     }
 }
 
