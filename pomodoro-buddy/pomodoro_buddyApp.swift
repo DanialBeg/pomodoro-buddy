@@ -124,7 +124,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupNotifications() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             _ = error
         }
     }
@@ -403,21 +403,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     
     func isLaunchAtLoginEnabled() -> Bool {
-        guard Bundle.main.bundleIdentifier != nil else { return false }
-        return SMAppService.mainApp.status == .enabled
+        if #available(macOS 13.0, *) {
+            return SMAppService.mainApp.status == .enabled
+        } else {
+            // For macOS 11.0-12.x, we'll maintain state locally since SMAppService isn't available
+            // and the deprecated SMCopyAllJobDictionaries produces warnings
+            return UserDefaults.standard.bool(forKey: "LaunchAtLogin")
+        }
     }
     
     func enableLaunchAtLogin() {
-        do {
-            try SMAppService.mainApp.register()
-        } catch {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        
+        if #available(macOS 13.0, *) {
+            do {
+                try SMAppService.mainApp.register()
+            } catch {
+                print("Failed to enable launch at login: \(error)")
+            }
+        } else {
+            // For macOS 11.0-12.x, use the legacy SMLoginItemSetEnabled API
+            let success = SMLoginItemSetEnabled(bundleIdentifier as CFString, true)
+            // Store the state locally for UI consistency
+            UserDefaults.standard.set(success, forKey: "LaunchAtLogin")
         }
     }
     
     func disableLaunchAtLogin() {
-        do {
-            try SMAppService.mainApp.unregister()
-        } catch {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        
+        if #available(macOS 13.0, *) {
+            do {
+                try SMAppService.mainApp.unregister()
+            } catch {
+                print("Failed to disable launch at login: \(error)")
+            }
+        } else {
+            // For macOS 11.0-12.x, use the legacy SMLoginItemSetEnabled API
+            let success = SMLoginItemSetEnabled(bundleIdentifier as CFString, false)
+            // Store the state locally for UI consistency
+            UserDefaults.standard.set(!success, forKey: "LaunchAtLogin")
         }
     }
     

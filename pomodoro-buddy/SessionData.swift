@@ -150,6 +150,17 @@ class SessionDataManager: ObservableObject {
         addSession(session)
     }
     
+    // MARK: - Goal Management
+    func updateDailyGoal(_ newGoal: Int) {
+        settings.dailyGoal = max(1, newGoal) // Ensure minimum of 1
+        saveData()
+        NotificationCenter.default.post(name: .pomodoroSettingsChanged, object: nil)
+    }
+    
+    func getDailyGoal() -> Int {
+        return settings.dailyGoal
+    }
+    
     // MARK: - Statistics
     func getTodaysStats() -> (completedPomodoros: Int, totalFocusTime: TimeInterval) {
         let today = Calendar.current.startOfDay(for: Date())
@@ -183,16 +194,69 @@ class SessionDataManager: ObservableObject {
         return (totalPomodoros, averagePerDay, streak)
     }
     
+    struct DailySessionBreakdown {
+        let date: Date
+        let dayName: String
+        let workSessions: Int
+        let shortBreaks: Int
+        let longBreaks: Int
+        let totalFocusTime: TimeInterval
+        let isToday: Bool
+    }
+    
+    func getWeeklySessionBreakdown() -> [DailySessionBreakdown] {
+        let calendar = Calendar.current
+        let today = Date()
+        let todayStart = calendar.startOfDay(for: today)
+        
+        var weekDays: [DailySessionBreakdown] = []
+        
+        // Get the last 7 days (including today)
+        for i in 0..<7 {
+            guard let dayDate = calendar.date(byAdding: .day, value: -i, to: todayStart) else { continue }
+            
+            let daySessions = sessions.filter { session in
+                calendar.isDate(session.startTime, inSameDayAs: dayDate) && session.isCompleted
+            }
+            
+            let workSessions = daySessions.filter { $0.sessionType == .work }
+            let shortBreaks = daySessions.filter { $0.sessionType == .shortBreak }
+            let longBreaks = daySessions.filter { $0.sessionType == .longBreak }
+            let totalFocusTime = workSessions.reduce(0) { $0 + $1.duration }
+            
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateFormat = "EEE"
+            let dayName = dayFormatter.string(from: dayDate)
+            
+            let breakdown = DailySessionBreakdown(
+                date: dayDate,
+                dayName: dayName,
+                workSessions: workSessions.count,
+                shortBreaks: shortBreaks.count,
+                longBreaks: longBreaks.count,
+                totalFocusTime: totalFocusTime,
+                isToday: calendar.isDate(dayDate, inSameDayAs: today)
+            )
+            
+            weekDays.append(breakdown)
+        }
+        
+        // Return in chronological order (oldest first)
+        return weekDays.reversed()
+    }
+    
     func getSessionHistory() -> [(date: Date, sessions: [PomodoroSession])] {
         let calendar = Calendar.current
-        let groupedSessions = Dictionary(grouping: sessions.filter { $0.isCompleted }) { session in
+        let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        
+        let groupedSessions = Dictionary(grouping: sessions.filter { session in
+            session.isCompleted && session.startTime >= oneWeekAgo
+        }) { session in
             calendar.startOfDay(for: session.startTime)
         }
         
         return groupedSessions.map { (date: $0.key, sessions: $0.value) }
             .sorted { $0.date > $1.date }
-            .prefix(30)
-            .map { $0 }
     }
     
     private func calculateStreak() -> Int {
