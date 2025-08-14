@@ -12,6 +12,7 @@ protocol PomodoroTimerDelegate: AnyObject {
     func timerDidUpdate()
     func timerDidComplete()
     func sessionTypeDidChange(_ sessionType: SessionType)
+    func sessionDidComplete(sessionType: SessionType)
 }
 
 class PomodoroTimer: ObservableObject {
@@ -33,9 +34,14 @@ class PomodoroTimer: ObservableObject {
     private(set) var cyclePosition: Int = 1 // 1-4 for work sessions
     private var fullPomodoroMode: Bool = false
     private var settings: UserSettings?
+    private var isCompleting: Bool = false
     
     func start() {
         guard !isRunning else { return }
+        
+        // Ensure any existing timer is invalidated first
+        timer?.invalidate()
+        timer = nil
         
         isRunning = true
         isPaused = false
@@ -74,6 +80,11 @@ class PomodoroTimer: ObservableObject {
         // Add timer to main run loop with .common mode to continue during menu interactions
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+        
+        // Notify delegate that timer has started (on main thread)
+        DispatchQueue.main.async { [weak self] in
+            self?.delegate?.timerDidUpdate()
+        }
     }
     
     func pause() {
@@ -155,12 +166,14 @@ class PomodoroTimer: ObservableObject {
         }
         
         totalTime = duration
-        if !isRunning && !isPaused {
-            timeRemaining = duration
-        }
+        // Always reset timeRemaining when changing session types to ensure fresh start
+        timeRemaining = duration
         
-        delegate?.timerDidUpdate()
-        delegate?.sessionTypeDidChange(currentSessionType)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.delegate?.timerDidUpdate()
+            self.delegate?.sessionTypeDidChange(self.currentSessionType)
+        }
     }
     
     func getCurrentSessionInfo() -> (type: SessionType, position: Int, totalInCycle: Int) {
@@ -168,12 +181,17 @@ class PomodoroTimer: ObservableObject {
     }
     
     private func tick() {
-        guard let startTime = startTime else { return }
+        guard let startTime = startTime, 
+              isRunning,
+              timer != nil else { return }
         
         let elapsed = Date().timeIntervalSince(startTime) - pausedDuration
         timeRemaining = max(0, totalTime - Int(elapsed))
         
-        delegate?.timerDidUpdate()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.delegate?.timerDidUpdate()
+        }
         
         if timeRemaining <= 0 {
             complete()
@@ -197,21 +215,38 @@ class PomodoroTimer: ObservableObject {
     }
     
     private func complete() {
+        // Prevent multiple simultaneous completions
+        guard !isCompleting else { return }
+        isCompleting = true
+        
         if fullPomodoroMode {
             handleFullPomodoroCompletion()
         } else {
             // Simple work timer mode - just stop
+            let completedSessionType = currentSessionType
             stop()
-            delegate?.timerDidComplete()
+            DispatchQueue.main.async { [weak self] in
+                self?.delegate?.timerDidComplete()
+                // Only save work sessions for statistics - breaks are not tracked
+                if completedSessionType == .work {
+                    self?.delegate?.sessionDidComplete(sessionType: completedSessionType)
+                }
+                self?.isCompleting = false
+            }
         }
     }
     
     private func handleFullPomodoroCompletion() {
         guard let settings = settings else {
             stop()
-            delegate?.timerDidComplete()
+            DispatchQueue.main.async { [weak self] in
+                self?.delegate?.timerDidComplete()
+                self?.isCompleting = false
+            }
             return
         }
+        
+        let previousSessionType = currentSessionType
         
         switch currentSessionType {
         case .work:
@@ -236,18 +271,44 @@ class PomodoroTimer: ObservableObject {
         // Update timer for new session type
         updateTimerForCurrentSession()
         
-        // Notify completion
+        // Always stop the current timer first
         stop()
-        delegate?.timerDidComplete()
         
-        // Auto-start next session if desired (for now, require manual start)
-        // Could add an auto-start setting later
+        // Check if we should auto-start (only for breaks after work sessions)
+        let shouldAutoStart = settings.autoStartBreaks && 
+                              previousSessionType == .work && 
+                              (currentSessionType == .shortBreak || currentSessionType == .longBreak)
+        
+        if shouldAutoStart {
+            // Add delay to ensure proper state transition and completion handling
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self = self else { return }
+                // Only auto-start if we're still in a valid state
+                guard !self.isRunning && !self.isPaused && !self.isCompleting else { return }
+                self.start()
+            }
+        }
+        
+        // Notify completion with the session type that just completed (on main thread)
+        DispatchQueue.main.async { [weak self] in
+            self?.delegate?.timerDidComplete()
+            // Only save work sessions for statistics - breaks are not tracked
+            if previousSessionType == .work {
+                self?.delegate?.sessionDidComplete(sessionType: previousSessionType)
+            }
+            self?.isCompleting = false
+        }
     }
     
     deinit {
+        // Immediately invalidate timer to prevent further callbacks
         timer?.invalidate()
+        timer = nil
+        
+        // Clean up workspace notifications
         if isObservingWorkspace {
             NSWorkspace.shared.notificationCenter.removeObserver(self)
+            isObservingWorkspace = false
         }
     }
 }

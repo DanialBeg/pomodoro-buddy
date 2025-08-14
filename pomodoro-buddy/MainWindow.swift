@@ -433,6 +433,7 @@ struct PreferencesView: View {
     @State private var notificationsEnabled: Bool = true
     @State private var dailyGoal: Double = 8
     @State private var fullPomodoroMode: Bool = false
+    @State private var autoStartBreaks: Bool = true
     
     var body: some View {
         ScrollView {
@@ -449,6 +450,14 @@ struct PreferencesView: View {
                              "Simple work timer only")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        
+                        if fullPomodoroMode {
+                            Toggle("Auto-start breaks", isOn: $autoStartBreaks)
+                                .padding(.top, 8)
+                            Text("Automatically start break timers when work sessions complete")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                     .padding()
                     .background(Color.gray.opacity(0.1))
@@ -465,7 +474,7 @@ struct PreferencesView: View {
                             Text("Work Duration: \(Int(workDuration)) minutes")
                                 .font(.subheadline)
                                 .fontWeight(.medium)
-                            Slider(value: $workDuration, in: 10...90, step: 5)
+                            Slider(value: $workDuration, in: 1...90, step: 1)
                         }
                         
                         if fullPomodoroMode {
@@ -531,6 +540,7 @@ struct PreferencesView: View {
             notificationsEnabled = dataManager.settings.notificationsEnabled
             dailyGoal = Double(dataManager.settings.dailyGoal)
             fullPomodoroMode = dataManager.settings.fullPomodoroMode
+            autoStartBreaks = dataManager.settings.autoStartBreaks
         }
         .onChange(of: workDuration) { _ in saveSettings() }
         .onChange(of: shortBreakDuration) { _ in saveSettings() }
@@ -540,6 +550,7 @@ struct PreferencesView: View {
         .onChange(of: notificationsEnabled) { _ in saveSettings() }
         .onChange(of: dailyGoal) { _ in saveSettings() }
         .onChange(of: fullPomodoroMode) { _ in saveSettings() }
+        .onChange(of: autoStartBreaks) { _ in saveSettings() }
     }
     
     private func saveSettings() {
@@ -551,7 +562,8 @@ struct PreferencesView: View {
             soundEnabled: soundEnabled,
             notificationsEnabled: notificationsEnabled,
             dailyGoal: Int(dailyGoal),
-            fullPomodoroMode: fullPomodoroMode
+            fullPomodoroMode: fullPomodoroMode,
+            autoStartBreaks: autoStartBreaks
         )
         dataManager.updateSettings(newSettings)
     }
@@ -739,6 +751,14 @@ struct GoalsView: View {
     @State private var showingGoalEditor = false
     @State private var newGoalText = ""
     
+    private var displayGoalText: String {
+        if newGoalText.isEmpty {
+            let currentGoal = dataManager.getDailyGoal()
+            return currentGoal > 0 ? String(currentGoal) : "8"
+        }
+        return newGoalText
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -917,8 +937,9 @@ struct GoalsView: View {
                         
                         HStack(spacing: 16) {
                             Button(action: {
-                                if let currentGoal = Int(newGoalText), currentGoal > 1 {
-                                    newGoalText = String(currentGoal - 1)
+                                let currentValue = newGoalText.isEmpty ? dataManager.getDailyGoal() : (Int(newGoalText) ?? dataManager.getDailyGoal())
+                                if currentValue > 1 {
+                                    newGoalText = String(currentValue - 1)
                                 }
                             }) {
                                 ZStack {
@@ -934,19 +955,18 @@ struct GoalsView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             .contentShape(Circle())
-                            .disabled(Int(newGoalText) == nil || Int(newGoalText)! <= 1)
+                            .disabled((Int(displayGoalText) ?? 1) <= 1)
                             
-                            Text(newGoalText)
+                            Text(displayGoalText)
                                 .font(.title)
                                 .fontWeight(.semibold)
                                 .frame(minWidth: 80)
                                 .foregroundColor(.accentColor)
                             
                             Button(action: {
-                                if let currentGoal = Int(newGoalText), currentGoal < 20 {
-                                    newGoalText = String(currentGoal + 1)
-                                } else if Int(newGoalText) == nil {
-                                    newGoalText = "8"
+                                let currentValue = newGoalText.isEmpty ? dataManager.getDailyGoal() : (Int(newGoalText) ?? dataManager.getDailyGoal())
+                                if currentValue < 20 {
+                                    newGoalText = String(currentValue + 1)
                                 }
                             }) {
                                 ZStack {
@@ -962,7 +982,7 @@ struct GoalsView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             .contentShape(Circle())
-                            .disabled(Int(newGoalText) != nil && Int(newGoalText)! >= 20)
+                            .disabled((Int(displayGoalText) ?? 8) >= 20)
                         }
                         
                         Text("pomodoros per day")
@@ -995,7 +1015,7 @@ struct GoalsView: View {
                     .background(Color.accentColor)
                     .foregroundColor(.white)
                     .cornerRadius(8)
-                    .disabled(Int(newGoalText) == nil || Int(newGoalText)! <= 0)
+                    .disabled((Int(displayGoalText) ?? 0) <= 0)
                 }
                 
                 Spacer()
