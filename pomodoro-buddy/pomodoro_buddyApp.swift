@@ -46,6 +46,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var sessionStartTime: Date?
     var keyboardShortcutManager: KeyboardShortcutManager?
     
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         
@@ -148,12 +149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if settings.fullPomodoroMode {
                     let sessionInfo = timer.getCurrentSessionInfo()
                     let emoji = sessionInfo.type.emoji
-                    
-                    if sessionInfo.type == .work {
-                        button.title = "\(emoji) \(timeString) (\(sessionInfo.position)/\(sessionInfo.totalInCycle))"
-                    } else {
-                        button.title = "\(emoji) \(timeString)"
-                    }
+                    button.title = "\(emoji) \(timeString)"
                 } else {
                     button.title = timeString
                 }
@@ -182,14 +178,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let menu = NSMenu()
         
-        // Show current session info in full Pomodoro mode
-        if let settings = dataManager?.settings, settings.fullPomodoroMode, let timer = pomodoroTimer {
-            let sessionInfo = timer.getCurrentSessionInfo()
-            let sessionTitle = "\(sessionInfo.type.emoji) \(sessionInfo.type.displayName)"
-            if sessionInfo.type == .work {
-                menu.addItem(NSMenuItem(title: "\(sessionTitle) (\(sessionInfo.position)/\(sessionInfo.totalInCycle))", action: nil, keyEquivalent: ""))
-            } else {
+        // Show current session info and daily progress
+        if let settings = dataManager?.settings, let timer = pomodoroTimer {
+            if settings.fullPomodoroMode {
+                let sessionInfo = timer.getCurrentSessionInfo()
+                let sessionTitle = "\(sessionInfo.type.emoji) \(sessionInfo.type.displayName)"
                 menu.addItem(NSMenuItem(title: sessionTitle, action: nil, keyEquivalent: ""))
+            }
+            
+            // Always show daily progress (only calculated when menu is opened)
+            if let dailyProgress = dataManager?.getDailyGoalProgress() {
+                let progressTitle = "Daily Progress: \(dailyProgress.completed)/\(dailyProgress.goal)"
+                menu.addItem(NSMenuItem(title: progressTitle, action: nil, keyEquivalent: ""))
             }
             menu.addItem(NSMenuItem.separator())
         }
@@ -494,8 +494,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         keyboardShortcutManager?.registerHotKeys(shortcuts: shortcuts)
         
-        // Update menu to reflect any changes
+        // Force immediate update of menu bar title and menu
+        updateMenuBarTitle()
         setupMenu()
+        
+        // Force display refresh
+        statusItem?.button?.needsDisplay = true
     }
     
     @objc private func quit() {
@@ -569,23 +573,29 @@ extension AppDelegate: PomodoroTimerDelegate {
         DispatchQueue.main.async {
             self.updateMenuBarTitle()
             self.showCompletionNotification()
-            self.saveCompletedSession()
+            // Refresh menu to show updated daily progress
+            self.setupMenu()
         }
     }
     
-    private func saveCompletedSession() {
+    func sessionDidComplete(sessionType: SessionType) {
+        DispatchQueue.main.async {
+            self.saveCompletedSession(sessionType: sessionType)
+            // Refresh menu after saving session to update daily progress
+            self.setupMenu()
+        }
+    }
+    
+    private func saveCompletedSession(sessionType: SessionType) {
         guard let startTime = sessionStartTime,
               let timer = pomodoroTimer,
               let dataManager = dataManager else { return }
         
-        // Get the current session type from timer
-        let sessionInfo = timer.getCurrentSessionInfo()
-        
-        // Save the completed session with correct type
+        // Save the completed session with the correct session type
         dataManager.saveCurrentSession(
             startTime: startTime,
             duration: TimeInterval(timer.totalTime),
-            sessionType: sessionInfo.type,
+            sessionType: sessionType,
             isCompleted: true
         )
         
@@ -635,7 +645,19 @@ extension AppDelegate: PomodoroTimerDelegate {
         let request = UNNotificationRequest(identifier: "pomodoro-complete", content: content, trigger: nil)
         
         UNUserNotificationCenter.current().add(request) { error in
-            _ = error
+            if let error = error {
+                NSLog("Failed to show notification: \(error)")
+            }
+        }
+        
+        // Also play system sound as backup (works even if notifications are disabled)
+        if settings.soundEnabled {
+            // Try to play a pleasant system sound, fall back to beep if not available
+            if let sound = NSSound(named: "Glass") {
+                sound.play()
+            } else {
+                NSSound.beep()
+            }
         }
     }
 }

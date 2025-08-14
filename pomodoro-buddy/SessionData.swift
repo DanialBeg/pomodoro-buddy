@@ -94,6 +94,7 @@ struct UserSettings: Codable {
     var notificationsEnabled: Bool = true
     var dailyGoal: Int = 8 // pomodoros per day
     var fullPomodoroMode: Bool = false // false = work timer only, true = full cycle
+    var autoStartBreaks: Bool = true // automatically start break timers
     var keyboardShortcuts: [KeyboardShortcut]
     
     init() {
@@ -105,7 +106,7 @@ struct UserSettings: Codable {
     
     init(workDuration: Int, shortBreakDuration: Int, longBreakDuration: Int, 
          longBreakInterval: Int, soundEnabled: Bool, notificationsEnabled: Bool,
-         dailyGoal: Int, fullPomodoroMode: Bool) {
+         dailyGoal: Int, fullPomodoroMode: Bool, autoStartBreaks: Bool = true) {
         self.workDuration = workDuration
         self.shortBreakDuration = shortBreakDuration
         self.longBreakDuration = longBreakDuration
@@ -114,6 +115,7 @@ struct UserSettings: Codable {
         self.notificationsEnabled = notificationsEnabled
         self.dailyGoal = dailyGoal
         self.fullPomodoroMode = fullPomodoroMode
+        self.autoStartBreaks = autoStartBreaks
         // Initialize with default shortcuts
         self.keyboardShortcuts = KeyboardShortcut.ShortcutAction.allCases.map { action in
             KeyboardShortcut(action: action, key: action.defaultKey)
