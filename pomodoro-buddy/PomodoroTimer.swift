@@ -46,8 +46,8 @@ class PomodoroTimer: ObservableObject {
         isRunning = true
         isPaused = false
         
-        if startTime == nil {
-            // First time starting - set initial start time based on current timeRemaining
+        if startTime == nil || isPaused {
+            // Starting fresh or resuming from pause - set start time based on current timeRemaining
             let elapsedTime = TimeInterval(totalTime - timeRemaining)
             startTime = Date().addingTimeInterval(-elapsedTime)
             pausedDuration = 0
@@ -73,13 +73,13 @@ class PomodoroTimer: ObservableObject {
         }
         
         // Create timer with weak self to avoid retain cycle
-        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+        let newTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.tick()
         }
         
         // Add timer to main run loop with .common mode to continue during menu interactions
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        RunLoop.main.add(newTimer, forMode: .common)
+        self.timer = newTimer
         
         // Notify delegate that timer has started (on main thread)
         DispatchQueue.main.async { [weak self] in
@@ -94,6 +94,9 @@ class PomodoroTimer: ObservableObject {
         timer = nil
         isRunning = false
         isPaused = true
+        
+        // The timeRemaining is already correctly calculated by the tick() method
+        // No need to recalculate here - just preserve the current timeRemaining
         
         // Remove sleep/wake observers
         if isObservingWorkspace {
@@ -227,10 +230,8 @@ class PomodoroTimer: ObservableObject {
             stop()
             DispatchQueue.main.async { [weak self] in
                 self?.delegate?.timerDidComplete()
-                // Only save work sessions for statistics - breaks are not tracked
-                if completedSessionType == .work {
-                    self?.delegate?.sessionDidComplete(sessionType: completedSessionType)
-                }
+                // Save all completed sessions for statistics tracking
+                self?.delegate?.sessionDidComplete(sessionType: completedSessionType)
                 self?.isCompleting = false
             }
         }
@@ -292,10 +293,8 @@ class PomodoroTimer: ObservableObject {
         // Notify completion with the session type that just completed (on main thread)
         DispatchQueue.main.async { [weak self] in
             self?.delegate?.timerDidComplete()
-            // Only save work sessions for statistics - breaks are not tracked
-            if previousSessionType == .work {
-                self?.delegate?.sessionDidComplete(sessionType: previousSessionType)
-            }
+            // Save all completed sessions for statistics tracking
+            self?.delegate?.sessionDidComplete(sessionType: previousSessionType)
             self?.isCompleting = false
         }
     }

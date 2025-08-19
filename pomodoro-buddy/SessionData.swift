@@ -93,7 +93,7 @@ struct UserSettings: Codable {
     var soundEnabled: Bool = true
     var notificationsEnabled: Bool = true
     var dailyGoal: Int = 8 // pomodoros per day
-    var fullPomodoroMode: Bool = false // false = work timer only, true = full cycle
+    var fullPomodoroMode: Bool = true // false = work timer only, true = full cycle
     var autoStartBreaks: Bool = true // automatically start break timers
     var keyboardShortcuts: [KeyboardShortcut]
     

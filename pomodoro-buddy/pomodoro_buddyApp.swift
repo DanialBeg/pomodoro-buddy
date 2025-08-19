@@ -115,7 +115,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.title = "\u{1F345}"  // 🍅 tomato
+            button.title = "🍅"  // 🍅 tomato
             button.action = #selector(toggleMenu)
             button.target = self
         }
@@ -123,6 +123,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateMenuBarTitle()
         setupMenu()
     }
+    
     
     private func setupNotifications() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
@@ -158,12 +159,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 // Show current session type when not running
                 guard let settings = dataManager?.settings, settings.fullPomodoroMode else {
-                    button.title = "\u{1F345}"  // 🍅 tomato
+                    button.title = "🍅"  // 🍅 tomato
                     return
                 }
                 
                 let sessionInfo = pomodoroTimer?.getCurrentSessionInfo()
-                button.title = sessionInfo?.type.emoji ?? "\u{1F345}"  // 🍅 tomato
+                button.title = sessionInfo?.type.emoji ?? "🍅"  // 🍅 tomato
             }
         }
     }
@@ -588,13 +589,15 @@ extension AppDelegate: PomodoroTimerDelegate {
     
     private func saveCompletedSession(sessionType: SessionType) {
         guard let startTime = sessionStartTime,
-              let timer = pomodoroTimer,
               let dataManager = dataManager else { return }
         
-        // Save the completed session with the correct session type
+        // Calculate actual duration based on when the session started
+        let actualDuration = Date().timeIntervalSince(startTime)
+        
+        // Save the completed session with the actual time spent
         dataManager.saveCurrentSession(
             startTime: startTime,
-            duration: TimeInterval(timer.totalTime),
+            duration: actualDuration,
             sessionType: sessionType,
             isCompleted: true
         )
@@ -604,6 +607,16 @@ extension AppDelegate: PomodoroTimerDelegate {
     
     private func showCompletionNotification() {
         guard let settings = dataManager?.settings else { return }
+        
+        // Play sound regardless of notification settings
+        if settings.soundEnabled {
+            // Try a pleasant notification sound, fall back to beep
+            if let sound = NSSound(named: "Ping") {
+                sound.play()
+            } else {
+                NSSound.beep()
+            }
+        }
         
         // Only show notification if enabled in settings
         guard settings.notificationsEnabled else { return }
@@ -616,25 +629,45 @@ extension AppDelegate: PomodoroTimerDelegate {
             
             switch sessionInfo.type {
             case .work:
-                content.title = "\u{1F345} Work Session Complete"  // 🍅 tomato
+                content.title = "\u{1F345} Work Session Complete!"  // 🍅 tomato
                 if sessionInfo.position >= sessionInfo.totalInCycle {
-                    content.body = "Great work! Time for a long break to recharge."
+                    let breakDuration = settings.longBreakDuration
+                    if settings.autoStartBreaks {
+                        content.body = "Great work! Starting \(breakDuration)-minute long break automatically. Time to recharge!"
+                    } else {
+                        content.body = "Great work! Take a \(breakDuration)-minute long break to recharge. You've earned it!"
+                    }
                 } else {
-                    content.body = "Nice work! Take a short break and come back refreshed."
+                    let breakDuration = settings.shortBreakDuration
+                    if settings.autoStartBreaks {
+                        content.body = "Nice work! Starting \(breakDuration)-minute break automatically. Relax and come back refreshed!"
+                    } else {
+                        content.body = "Nice work! Take a \(breakDuration)-minute break and come back refreshed."
+                    }
                 }
                 
             case .shortBreak:
-                content.title = "\u{2615} Break Over"  // ☕ coffee
-                content.body = "Ready to focus? Let's start work session \(sessionInfo.position)/\(sessionInfo.totalInCycle)."
+                content.title = "\u{2615} Break Complete!"  // ☕ coffee
+                let workDuration = settings.workDuration
+                if settings.autoStartBreaks {
+                    content.body = "Break's over! Starting \(workDuration)-minute work session \(sessionInfo.position)/\(sessionInfo.totalInCycle). Let's focus!"
+                } else {
+                    content.body = "Break's over! Ready for \(workDuration)-minute work session \(sessionInfo.position)/\(sessionInfo.totalInCycle)?"
+                }
                 
             case .longBreak:
-                content.title = "\u{1F31F} Long Break Complete"  // 🌟 star
-                content.body = "Excellent! You've completed a full Pomodoro cycle. Ready for the next?"
+                content.title = "\u{1F31F} Long Break Complete!"  // 🌟 star
+                let workDuration = settings.workDuration
+                if settings.autoStartBreaks {
+                    content.body = "Excellent! You've completed a full cycle. Starting new \(workDuration)-minute work session. Fresh start!"
+                } else {
+                    content.body = "Excellent! You've completed a full Pomodoro cycle. Ready for a new \(workDuration)-minute work session?"
+                }
             }
         } else {
             // Simple work timer mode
-            content.title = "\u{1F345} Pomodoro Timer"  // 🍅 tomato
-            content.body = "Time's up! Take a break."
+            content.title = "\u{1F345} Timer Complete!"  // 🍅 tomato
+            content.body = "Time's up! Take a well-deserved break and start a new session when ready."
         }
         
         // Only add sound if enabled in settings
@@ -650,15 +683,6 @@ extension AppDelegate: PomodoroTimerDelegate {
             }
         }
         
-        // Also play system sound as backup (works even if notifications are disabled)
-        if settings.soundEnabled {
-            // Try to play a pleasant system sound, fall back to beep if not available
-            if let sound = NSSound(named: "Glass") {
-                sound.play()
-            } else {
-                NSSound.beep()
-            }
-        }
     }
 }
 
