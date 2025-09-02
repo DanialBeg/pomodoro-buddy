@@ -11,7 +11,9 @@ import AppKit
 protocol PomodoroTimerDelegate: AnyObject {
     func timerDidUpdate()
     func timerDidComplete()
+    func timerDidStart()
     func sessionTypeDidChange(_ sessionType: SessionType)
+    func sessionDidComplete(sessionType: SessionType)
 }
 
 class PomodoroTimer: ObservableObject {
@@ -21,6 +23,7 @@ class PomodoroTimer: ObservableObject {
     private var startTime: Date?
     private var pausedDuration: TimeInterval = 0
     private var pauseStartTime: Date?
+    private var pausedTimeRemaining: Int = 0 // Store exact time when paused
     private(set) var totalTime: Int = 25 * 60 // 25 minutes in seconds
     private(set) var timeRemaining: Int = 25 * 60
     private(set) var isRunning: Bool = false
@@ -33,15 +36,29 @@ class PomodoroTimer: ObservableObject {
     private(set) var cyclePosition: Int = 1 // 1-4 for work sessions
     private var fullPomodoroMode: Bool = false
     private var settings: UserSettings?
+    private var isCompleting: Bool = false
     
     func start() {
         guard !isRunning else { return }
+        
+        // Ensure any existing timer is invalidated first
+        timer?.invalidate()
+        timer = nil
+        
+        // Check if we're resuming from pause BEFORE setting isPaused = false
+        let wasResuming = isPaused
         
         isRunning = true
         isPaused = false
         
         if startTime == nil {
             // First time starting - set initial start time based on current timeRemaining
+            let elapsedTime = TimeInterval(totalTime - timeRemaining)
+            startTime = Date().addingTimeInterval(-elapsedTime)
+            pausedDuration = 0
+        } else if wasResuming {
+            // Resuming from pause - restore the exact paused time and set new start time
+            timeRemaining = pausedTimeRemaining
             let elapsedTime = TimeInterval(totalTime - timeRemaining)
             startTime = Date().addingTimeInterval(-elapsedTime)
             pausedDuration = 0
@@ -67,17 +84,26 @@ class PomodoroTimer: ObservableObject {
         }
         
         // Create timer with weak self to avoid retain cycle
-        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+        let newTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.tick()
         }
         
         // Add timer to main run loop with .common mode to continue during menu interactions
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        RunLoop.main.add(newTimer, forMode: .common)
+        self.timer = newTimer
+        
+        // Notify delegate that timer has started (on main thread)
+        DispatchQueue.main.async { [weak self] in
+            self?.delegate?.timerDidStart()
+            self?.delegate?.timerDidUpdate()
+        }
     }
     
     func pause() {
         guard isRunning else { return }
+        
+        // Store the exact timeRemaining when pausing
+        pausedTimeRemaining = timeRemaining
         
         timer?.invalidate()
         timer = nil
@@ -101,6 +127,7 @@ class PomodoroTimer: ObservableObject {
         startTime = nil
         pausedDuration = 0
         pauseStartTime = nil
+        pausedTimeRemaining = 0
         
         // Remove sleep/wake observers
         if isObservingWorkspace {
@@ -117,8 +144,29 @@ class PomodoroTimer: ObservableObject {
         startTime = nil
         pausedDuration = 0
         pauseStartTime = nil
+        pausedTimeRemaining = 0
         isPaused = false
         delegate?.timerDidUpdate()
+    }
+    
+    func resetToWorkSession() {
+        // Reset to a fresh work session
+        stop()
+        
+        // Reset to work session
+        currentSessionType = .work
+        workSessionsCompleted = 0
+        cyclePosition = 1
+        
+        // Update timer for work session duration
+        updateTimerForCurrentSession()
+        
+        // Notify delegates of the session type change
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.delegate?.timerDidUpdate()
+            self.delegate?.sessionTypeDidChange(self.currentSessionType)
+        }
     }
     
     func setCustomTime(minutes: Int) {
@@ -155,12 +203,15 @@ class PomodoroTimer: ObservableObject {
         }
         
         totalTime = duration
-        if !isRunning && !isPaused {
-            timeRemaining = duration
-        }
+        // Always reset timeRemaining when changing session types or updating settings
+        // This ensures the menu bar shows the correct time when settings change
+        timeRemaining = duration
         
-        delegate?.timerDidUpdate()
-        delegate?.sessionTypeDidChange(currentSessionType)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.delegate?.timerDidUpdate()
+            self.delegate?.sessionTypeDidChange(self.currentSessionType)
+        }
     }
     
     func getCurrentSessionInfo() -> (type: SessionType, position: Int, totalInCycle: Int) {
@@ -168,12 +219,17 @@ class PomodoroTimer: ObservableObject {
     }
     
     private func tick() {
-        guard let startTime = startTime else { return }
+        guard let startTime = startTime, 
+              isRunning,
+              timer != nil else { return }
         
         let elapsed = Date().timeIntervalSince(startTime) - pausedDuration
         timeRemaining = max(0, totalTime - Int(elapsed))
         
-        delegate?.timerDidUpdate()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.delegate?.timerDidUpdate()
+        }
         
         if timeRemaining <= 0 {
             complete()
@@ -197,21 +253,36 @@ class PomodoroTimer: ObservableObject {
     }
     
     private func complete() {
+        // Prevent multiple simultaneous completions
+        guard !isCompleting else { return }
+        isCompleting = true
+        
         if fullPomodoroMode {
             handleFullPomodoroCompletion()
         } else {
             // Simple work timer mode - just stop
+            let completedSessionType = currentSessionType
             stop()
-            delegate?.timerDidComplete()
+            DispatchQueue.main.async { [weak self] in
+                self?.delegate?.timerDidComplete()
+                // Save all completed sessions for statistics tracking
+                self?.delegate?.sessionDidComplete(sessionType: completedSessionType)
+                self?.isCompleting = false
+            }
         }
     }
     
     private func handleFullPomodoroCompletion() {
         guard let settings = settings else {
             stop()
-            delegate?.timerDidComplete()
+            DispatchQueue.main.async { [weak self] in
+                self?.delegate?.timerDidComplete()
+                self?.isCompleting = false
+            }
             return
         }
+        
+        let previousSessionType = currentSessionType
         
         switch currentSessionType {
         case .work:
@@ -236,18 +307,45 @@ class PomodoroTimer: ObservableObject {
         // Update timer for new session type
         updateTimerForCurrentSession()
         
-        // Notify completion
+        // Always stop the current timer first
         stop()
-        delegate?.timerDidComplete()
         
-        // Auto-start next session if desired (for now, require manual start)
-        // Could add an auto-start setting later
+        // Check if we should auto-start
+        let shouldAutoStart = settings.autoStartBreaks && (
+            // Start breaks after work sessions
+            (previousSessionType == .work && (currentSessionType == .shortBreak || currentSessionType == .longBreak)) ||
+            // Start work sessions after breaks (continuous Pomodoro cycling)
+            ((previousSessionType == .shortBreak || previousSessionType == .longBreak) && currentSessionType == .work)
+        )
+        
+        if shouldAutoStart {
+            // Add delay to ensure proper state transition and completion handling
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self = self else { return }
+                // Only auto-start if we're still in a valid state
+                guard !self.isRunning && !self.isPaused && !self.isCompleting else { return }
+                self.start()
+            }
+        }
+        
+        // Notify completion with the session type that just completed (on main thread)
+        DispatchQueue.main.async { [weak self] in
+            self?.delegate?.timerDidComplete()
+            // Save all completed sessions for statistics tracking
+            self?.delegate?.sessionDidComplete(sessionType: previousSessionType)
+            self?.isCompleting = false
+        }
     }
     
     deinit {
+        // Immediately invalidate timer to prevent further callbacks
         timer?.invalidate()
+        timer = nil
+        
+        // Clean up workspace notifications
         if isObservingWorkspace {
             NSWorkspace.shared.notificationCenter.removeObserver(self)
+            isObservingWorkspace = false
         }
     }
 }

@@ -46,6 +46,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var sessionStartTime: Date?
     var keyboardShortcutManager: KeyboardShortcutManager?
     
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         
@@ -114,14 +115,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.title = "\u{1F345}"  // 🍅 tomato
-            button.action = #selector(toggleMenu)
-            button.target = self
+            button.title = "🍅"  // 🍅 tomato
+            // Remove custom action - let system handle menu normally
+            button.action = nil
+            button.target = nil
         }
         
         updateMenuBarTitle()
         setupMenu()
     }
+    
     
     private func setupNotifications() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
@@ -148,12 +151,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if settings.fullPomodoroMode {
                     let sessionInfo = timer.getCurrentSessionInfo()
                     let emoji = sessionInfo.type.emoji
-                    
-                    if sessionInfo.type == .work {
-                        button.title = "\(emoji) \(timeString) (\(sessionInfo.position)/\(sessionInfo.totalInCycle))"
-                    } else {
-                        button.title = "\(emoji) \(timeString)"
-                    }
+                    button.title = "\(emoji) \(timeString)"
                 } else {
                     button.title = timeString
                 }
@@ -162,19 +160,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 // Show current session type when not running
                 guard let settings = dataManager?.settings, settings.fullPomodoroMode else {
-                    button.title = "\u{1F345}"  // 🍅 tomato
+                    button.title = "🍅"  // 🍅 tomato
                     return
                 }
                 
                 let sessionInfo = pomodoroTimer?.getCurrentSessionInfo()
-                button.title = sessionInfo?.type.emoji ?? "\u{1F345}"  // 🍅 tomato
+                button.title = sessionInfo?.type.emoji ?? "🍅"  // 🍅 tomato
             }
         }
     }
     
-    @objc private func toggleMenu() {
-        statusItem?.button?.performClick(nil)
-    }
     
     private func setupMenu() {
         // Clean up existing menu to prevent memory leaks
@@ -182,22 +177,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let menu = NSMenu()
         
-        // Show current session info in full Pomodoro mode
-        if let settings = dataManager?.settings, settings.fullPomodoroMode, let timer = pomodoroTimer {
-            let sessionInfo = timer.getCurrentSessionInfo()
-            let sessionTitle = "\(sessionInfo.type.emoji) \(sessionInfo.type.displayName)"
-            if sessionInfo.type == .work {
-                menu.addItem(NSMenuItem(title: "\(sessionTitle) (\(sessionInfo.position)/\(sessionInfo.totalInCycle))", action: nil, keyEquivalent: ""))
-            } else {
+        // Show current session info and daily progress
+        if let settings = dataManager?.settings, let timer = pomodoroTimer {
+            if settings.fullPomodoroMode {
+                let sessionInfo = timer.getCurrentSessionInfo()
+                let sessionTitle = "\(sessionInfo.type.emoji) \(sessionInfo.type.displayName)"
                 menu.addItem(NSMenuItem(title: sessionTitle, action: nil, keyEquivalent: ""))
+            }
+            
+            // Always show daily progress (only calculated when menu is opened)
+            if let dailyProgress = dataManager?.getDailyGoalProgress() {
+                let progressTitle = "Daily Progress: \(dailyProgress.completed)/\(dailyProgress.goal)"
+                menu.addItem(NSMenuItem(title: progressTitle, action: nil, keyEquivalent: ""))
             }
             menu.addItem(NSMenuItem.separator())
         }
         
-        // Dynamic start/pause button
-        let startPauseTitle = pomodoroTimer?.isRunning == true ? "Pause Timer" : "Start Timer"
-        menu.addItem(NSMenuItem(title: startPauseTitle, action: #selector(toggleStartPause), keyEquivalent: "s"))
-        menu.addItem(NSMenuItem(title: "Reset Timer", action: #selector(resetTimer), keyEquivalent: "r"))
+        // Dynamic timer controls
+        if let timer = pomodoroTimer {
+            if timer.isRunning {
+                menu.addItem(NSMenuItem(title: "Pause Timer", action: #selector(pauseTimer), keyEquivalent: "s"))
+                menu.addItem(NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: ""))
+                menu.addItem(NSMenuItem(title: "Reset to Work Session", action: #selector(resetToWorkSession), keyEquivalent: "r"))
+            } else if timer.isPaused {
+                menu.addItem(NSMenuItem(title: "Resume Timer", action: #selector(startTimer), keyEquivalent: "s"))
+                menu.addItem(NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: ""))
+                menu.addItem(NSMenuItem(title: "Reset to Work Session", action: #selector(resetToWorkSession), keyEquivalent: "r"))
+            } else {
+                menu.addItem(NSMenuItem(title: "Start Timer", action: #selector(startTimer), keyEquivalent: "s"))
+                menu.addItem(NSMenuItem(title: "Reset to Work Session", action: #selector(resetToWorkSession), keyEquivalent: "r"))
+            }
+        } else {
+            menu.addItem(NSMenuItem(title: "Start Timer", action: #selector(startTimer), keyEquivalent: "s"))
+            menu.addItem(NSMenuItem(title: "Reset to Work Session", action: #selector(resetToWorkSession), keyEquivalent: "r"))
+        }
         menu.addItem(NSMenuItem.separator())
         
         // Statistics window
@@ -215,6 +228,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
         
+        // Set menu for access by other methods, but control popup manually via action
         statusItem?.menu = menu
     }
     
@@ -334,23 +348,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     
-    @objc private func toggleStartPause() {
-        guard let timer = pomodoroTimer else { return }
-        
-        if timer.isRunning {
-            pomodoroTimer?.pause()
-        } else {
-            // Track session start time
-            sessionStartTime = Date()
-            pomodoroTimer?.start()
-        }
+    @objc private func startTimer() {
+        // Track session start time
+        sessionStartTime = Date()
+        pomodoroTimer?.start()
         
         // Update menu to reflect new state
         setupMenu()
     }
     
-    @objc private func resetTimer() {
+    @objc private func pauseTimer() {
+        pomodoroTimer?.pause()
+        
+        // Update menu to reflect new state
+        setupMenu()
+    }
+    
+    
+    @objc private func stopTimer() {
         pomodoroTimer?.reset()
+        sessionStartTime = nil
+        setupMenu() // Update menu to show "Start Timer"
+    }
+    
+    @objc private func resetToWorkSession() {
+        // Reset to a fresh work session
+        pomodoroTimer?.resetToWorkSession()
         sessionStartTime = nil
         setupMenu() // Update menu to show "Start Timer"
     }
@@ -494,8 +517,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         keyboardShortcutManager?.registerHotKeys(shortcuts: shortcuts)
         
-        // Update menu to reflect any changes
+        // Force immediate update of menu bar title and menu
+        updateMenuBarTitle()
         setupMenu()
+        
+        // Force display refresh
+        statusItem?.button?.needsDisplay = true
     }
     
     @objc private func quit() {
@@ -551,10 +578,25 @@ extension AppDelegate: PomodoroTimerDelegate {
         // Update immediately without dispatch queue to avoid delays during menu interaction
         if Thread.isMainThread {
             self.updateMenuBarTitle()
+            // Don't refresh menu here - it causes the dropdown to disappear
+            // Menu will be refreshed when state changes occur
         } else {
             DispatchQueue.main.sync {
                 self.updateMenuBarTitle()
+                // Don't refresh menu here - it causes the dropdown to disappear
+                // Menu will be refreshed when state changes occur
             }
+        }
+    }
+    
+    func timerDidStart() {
+        // Track session start time for both manual and auto-started sessions
+        if sessionStartTime == nil {
+            sessionStartTime = Date()
+        }
+        // Refresh menu when timer state changes to running
+        DispatchQueue.main.async {
+            self.setupMenu()
         }
     }
     
@@ -569,23 +611,31 @@ extension AppDelegate: PomodoroTimerDelegate {
         DispatchQueue.main.async {
             self.updateMenuBarTitle()
             self.showCompletionNotification()
-            self.saveCompletedSession()
+            // Refresh menu to show updated daily progress
+            self.setupMenu()
         }
     }
     
-    private func saveCompletedSession() {
+    func sessionDidComplete(sessionType: SessionType) {
+        DispatchQueue.main.async {
+            self.saveCompletedSession(sessionType: sessionType)
+            // Refresh menu after saving session to update daily progress
+            self.setupMenu()
+        }
+    }
+    
+    private func saveCompletedSession(sessionType: SessionType) {
         guard let startTime = sessionStartTime,
-              let timer = pomodoroTimer,
               let dataManager = dataManager else { return }
         
-        // Get the current session type from timer
-        let sessionInfo = timer.getCurrentSessionInfo()
+        // Calculate actual duration based on when the session started
+        let actualDuration = Date().timeIntervalSince(startTime)
         
-        // Save the completed session with correct type
+        // Save the completed session with the actual time spent
         dataManager.saveCurrentSession(
             startTime: startTime,
-            duration: TimeInterval(timer.totalTime),
-            sessionType: sessionInfo.type,
+            duration: actualDuration,
+            sessionType: sessionType,
             isCompleted: true
         )
         
@@ -594,6 +644,11 @@ extension AppDelegate: PomodoroTimerDelegate {
     
     private func showCompletionNotification() {
         guard let settings = dataManager?.settings else { return }
+        
+        // Play sound regardless of notification settings
+        if settings.soundEnabled {
+            playCompletionSound()
+        }
         
         // Only show notification if enabled in settings
         guard settings.notificationsEnabled else { return }
@@ -606,25 +661,45 @@ extension AppDelegate: PomodoroTimerDelegate {
             
             switch sessionInfo.type {
             case .work:
-                content.title = "\u{1F345} Work Session Complete"  // 🍅 tomato
+                content.title = "\u{1F345} Work Session Complete!"  // 🍅 tomato
                 if sessionInfo.position >= sessionInfo.totalInCycle {
-                    content.body = "Great work! Time for a long break to recharge."
+                    let breakDuration = settings.longBreakDuration
+                    if settings.autoStartBreaks {
+                        content.body = "Great work! Starting \(breakDuration)-minute long break automatically. Time to recharge!"
+                    } else {
+                        content.body = "Great work! Take a \(breakDuration)-minute long break to recharge. You've earned it!"
+                    }
                 } else {
-                    content.body = "Nice work! Take a short break and come back refreshed."
+                    let breakDuration = settings.shortBreakDuration
+                    if settings.autoStartBreaks {
+                        content.body = "Nice work! Starting \(breakDuration)-minute break automatically. Relax and come back refreshed!"
+                    } else {
+                        content.body = "Nice work! Take a \(breakDuration)-minute break and come back refreshed."
+                    }
                 }
                 
             case .shortBreak:
-                content.title = "\u{2615} Break Over"  // ☕ coffee
-                content.body = "Ready to focus? Let's start work session \(sessionInfo.position)/\(sessionInfo.totalInCycle)."
+                content.title = "\u{2615} Break Complete!"  // ☕ coffee
+                let workDuration = settings.workDuration
+                if settings.autoStartBreaks {
+                    content.body = "Break's over! Starting \(workDuration)-minute work session \(sessionInfo.position)/\(sessionInfo.totalInCycle). Let's focus!"
+                } else {
+                    content.body = "Break's over! Ready for \(workDuration)-minute work session \(sessionInfo.position)/\(sessionInfo.totalInCycle)?"
+                }
                 
             case .longBreak:
-                content.title = "\u{1F31F} Long Break Complete"  // 🌟 star
-                content.body = "Excellent! You've completed a full Pomodoro cycle. Ready for the next?"
+                content.title = "\u{1F31F} Long Break Complete!"  // 🌟 star
+                let workDuration = settings.workDuration
+                if settings.autoStartBreaks {
+                    content.body = "Excellent! You've completed a full cycle. Starting new \(workDuration)-minute work session. Fresh start!"
+                } else {
+                    content.body = "Excellent! You've completed a full Pomodoro cycle. Ready for a new \(workDuration)-minute work session?"
+                }
             }
         } else {
             // Simple work timer mode
-            content.title = "\u{1F345} Pomodoro Timer"  // 🍅 tomato
-            content.body = "Time's up! Take a break."
+            content.title = "\u{1F345} Timer Complete!"  // 🍅 tomato
+            content.body = "Time's up! Take a well-deserved break and start a new session when ready."
         }
         
         // Only add sound if enabled in settings
@@ -635,7 +710,36 @@ extension AppDelegate: PomodoroTimerDelegate {
         let request = UNNotificationRequest(identifier: "pomodoro-complete", content: content, trigger: nil)
         
         UNUserNotificationCenter.current().add(request) { error in
-            _ = error
+            if let error = error {
+                NSLog("Failed to show notification: \(error)")
+            }
+        }
+        
+    }
+    
+    private func playCompletionSound() {
+        // Use a longer alert sound that plays for about 2-3 seconds
+        let soundName = "Glass" // Glass is a longer, more attention-grabbing alert sound
+        
+        if let sound = NSSound(named: soundName) {
+            sound.play()
+        } else {
+            // Try alternative longer alert sounds
+            let alternativeSounds = ["Sosumi", "Tink", "Purr"]
+            var soundPlayed = false
+            
+            for altSound in alternativeSounds {
+                if let sound = NSSound(named: altSound) {
+                    sound.play()
+                    soundPlayed = true
+                    break
+                }
+            }
+            
+            // Final fallback to system beep if no alert sounds available
+            if !soundPlayed {
+                NSSound.beep()
+            }
         }
     }
 }
@@ -644,9 +748,16 @@ extension AppDelegate: KeyboardShortcutManagerDelegate {
     func keyboardShortcutTriggered(action: String) {
         switch action {
         case "startPause":
-            toggleStartPause()
+            // Toggle between start/pause (not stop) for keyboard shortcuts
+            if let timer = pomodoroTimer {
+                if timer.isRunning {
+                    pauseTimer()
+                } else {
+                    startTimer()
+                }
+            }
         case "reset":
-            resetTimer()
+            resetToWorkSession()
         case "showStatistics":
             showStatistics()
         default:

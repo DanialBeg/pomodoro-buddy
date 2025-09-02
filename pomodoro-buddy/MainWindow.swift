@@ -433,6 +433,21 @@ struct PreferencesView: View {
     @State private var notificationsEnabled: Bool = true
     @State private var dailyGoal: Double = 8
     @State private var fullPomodoroMode: Bool = false
+    @State private var autoStartBreaks: Bool = true
+    
+    // Text field strings for backward compatibility
+    @State private var workDurationText: String = "25"
+    @State private var shortBreakDurationText: String = "5"
+    @State private var longBreakDurationText: String = "15"
+    @State private var longBreakIntervalText: String = "4"
+    @State private var dailyGoalText: String = "8"
+    
+    // Focus management using NSApp resignation
+    private func dismissKeyboard() {
+        DispatchQueue.main.async {
+            NSApp.keyWindow?.makeFirstResponder(nil)
+        }
+    }
     
     var body: some View {
         ScrollView {
@@ -449,6 +464,14 @@ struct PreferencesView: View {
                              "Simple work timer only")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        
+                        if fullPomodoroMode {
+                            Toggle("Auto-start breaks", isOn: $autoStartBreaks)
+                                .padding(.top, 8)
+                            Text("Automatically start break timers when work sessions complete")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                     .padding()
                     .background(Color.gray.opacity(0.1))
@@ -462,40 +485,135 @@ struct PreferencesView: View {
                         .padding(.bottom, 4)
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading) {
-                            Text("Work Duration: \(Int(workDuration)) minutes")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Slider(value: $workDuration, in: 10...90, step: 5)
+                            HStack {
+                                Text("Work Duration:")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                HStack(spacing: 4) {
+                                    TextField("", text: $workDurationText, onCommit: {
+                                        dismissKeyboard()
+                                    })
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .frame(width: 60)
+                                        .multilineTextAlignment(.center)
+                                        .onChange(of: workDurationText) { newValue in
+                                            if let value = Double(newValue), value >= 1 {
+                                                workDuration = value
+                                            }
+                                        }
+                                    Text("minutes")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Slider(value: $workDuration, in: 1...60, step: 1)
                         }
                         
                         if fullPomodoroMode {
                             VStack(alignment: .leading) {
-                                Text("Short Break: \(Int(shortBreakDuration)) minutes")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Slider(value: $shortBreakDuration, in: 1...15, step: 1)
+                                HStack {
+                                    Text("Short Break:")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    HStack(spacing: 4) {
+                                        TextField("", text: $shortBreakDurationText, onCommit: {
+                                            dismissKeyboard()
+                                        })
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                            .frame(width: 60)
+                                            .multilineTextAlignment(.center)
+                                            .onChange(of: shortBreakDurationText) { newValue in
+                                                if let value = Double(newValue), value >= 1 {
+                                                    shortBreakDuration = value
+                                                }
+                                            }
+                                        Text("minutes")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                Slider(value: $shortBreakDuration, in: 1...30, step: 1)
                             }
                             
                             VStack(alignment: .leading) {
-                                Text("Long Break: \(Int(longBreakDuration)) minutes")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Slider(value: $longBreakDuration, in: 10...45, step: 5)
+                                HStack {
+                                    Text("Long Break:")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    HStack(spacing: 4) {
+                                        TextField("", text: $longBreakDurationText, onCommit: {
+                                            dismissKeyboard()
+                                        })
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                            .frame(width: 60)
+                                            .multilineTextAlignment(.center)
+                                            .onChange(of: longBreakDurationText) { newValue in
+                                                if let value = Double(newValue), value >= 5 {
+                                                    longBreakDuration = value
+                                                }
+                                            }
+                                        Text("minutes")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                Slider(value: $longBreakDuration, in: 5...60, step: 5)
                             }
                             
                             VStack(alignment: .leading) {
-                                Text("Long Break Every: \(Int(longBreakInterval)) pomodoros")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Slider(value: $longBreakInterval, in: 2...8, step: 1)
+                                HStack {
+                                    Text("Long Break Every:")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    HStack(spacing: 4) {
+                                        TextField("", text: $longBreakIntervalText, onCommit: {
+                                            dismissKeyboard()
+                                        })
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                            .frame(width: 60)
+                                            .multilineTextAlignment(.center)
+                                            .onChange(of: longBreakIntervalText) { newValue in
+                                                if let value = Double(newValue), value >= 2 {
+                                                    longBreakInterval = value
+                                                }
+                                            }
+                                        Text("sessions")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                Slider(value: $longBreakInterval, in: 2...10, step: 1)
                             }
                         }
                         
                         VStack(alignment: .leading) {
-                            Text("Daily Goal: \(Int(dailyGoal)) pomodoros")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Slider(value: $dailyGoal, in: 1...20, step: 1)
+                            HStack {
+                                Text("Daily Goal:")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                HStack(spacing: 4) {
+                                    TextField("", text: $dailyGoalText, onCommit: {
+                                        dismissKeyboard()
+                                    })
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .frame(width: 60)
+                                        .multilineTextAlignment(.center)
+                                        .onChange(of: dailyGoalText) { newValue in
+                                            if let value = Double(newValue), value >= 1 {
+                                                dailyGoal = value
+                                            }
+                                        }
+                                    Text("sessions")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Slider(value: $dailyGoal, in: 1...30, step: 1)
                         }
                     }
                     .padding()
@@ -510,7 +628,7 @@ struct PreferencesView: View {
                         .padding(.bottom, 4)
                     VStack(alignment: .leading, spacing: 12) {
                         Toggle("Enable Sound", isOn: $soundEnabled)
-                        Toggle("Enable Notifications", isOn: $notificationsEnabled)
+//                        Toggle("Enable Notifications", isOn: $notificationsEnabled)
                     }
                     .padding()
                     .background(Color.gray.opacity(0.1))
@@ -520,6 +638,11 @@ struct PreferencesView: View {
                 Spacer()
             }
             .padding()
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Dismiss focus when tapping outside text fields
+            dismissKeyboard()
         }
         .onAppear {
             // Load current settings
@@ -531,18 +654,76 @@ struct PreferencesView: View {
             notificationsEnabled = dataManager.settings.notificationsEnabled
             dailyGoal = Double(dataManager.settings.dailyGoal)
             fullPomodoroMode = dataManager.settings.fullPomodoroMode
+            autoStartBreaks = dataManager.settings.autoStartBreaks
+            
+            // Validate and fix any experimental short durations
+            validateAndFixDurations()
+            
+            // Sync text fields
+            workDurationText = String(Int(workDuration))
+            shortBreakDurationText = String(Int(shortBreakDuration))
+            longBreakDurationText = String(Int(longBreakDuration))
+            longBreakIntervalText = String(Int(longBreakInterval))
+            dailyGoalText = String(Int(dailyGoal))
+            
+            // Save corrected settings if any were invalid
+            if dataManager.settings.workDuration != Int(workDuration) ||
+               dataManager.settings.shortBreakDuration != Int(shortBreakDuration) ||
+               dataManager.settings.longBreakDuration != Int(longBreakDuration) ||
+               dataManager.settings.longBreakInterval != Int(longBreakInterval) ||
+               dataManager.settings.dailyGoal != Int(dailyGoal) {
+                saveSettings()
+            }
         }
-        .onChange(of: workDuration) { _ in saveSettings() }
-        .onChange(of: shortBreakDuration) { _ in saveSettings() }
-        .onChange(of: longBreakDuration) { _ in saveSettings() }
-        .onChange(of: longBreakInterval) { _ in saveSettings() }
+        .onChange(of: workDuration) { _ in 
+            workDurationText = String(Int(workDuration))
+            saveSettings() 
+        }
+        .onChange(of: shortBreakDuration) { _ in 
+            shortBreakDurationText = String(Int(shortBreakDuration))
+            saveSettings() 
+        }
+        .onChange(of: longBreakDuration) { _ in 
+            longBreakDurationText = String(Int(longBreakDuration))
+            saveSettings() 
+        }
+        .onChange(of: longBreakInterval) { _ in 
+            longBreakIntervalText = String(Int(longBreakInterval))
+            saveSettings() 
+        }
         .onChange(of: soundEnabled) { _ in saveSettings() }
         .onChange(of: notificationsEnabled) { _ in saveSettings() }
-        .onChange(of: dailyGoal) { _ in saveSettings() }
+        .onChange(of: dailyGoal) { _ in 
+            dailyGoalText = String(Int(dailyGoal))
+            saveSettings() 
+        }
         .onChange(of: fullPomodoroMode) { _ in saveSettings() }
+        .onChange(of: autoStartBreaks) { _ in saveSettings() }
+    }
+    
+    private func validateAndFixDurations() {
+        // Ensure minimum durations 
+        if workDuration < 1 {
+            workDuration = 25 // Standard Pomodoro work duration
+        }
+        if shortBreakDuration < 1 {
+            shortBreakDuration = 5 // Standard Pomodoro short break
+        }
+        if longBreakDuration < 5 {
+            longBreakDuration = 15 // Standard Pomodoro long break
+        }
+        if longBreakInterval < 2 {
+            longBreakInterval = 4 // Standard Pomodoro cycle
+        }
+        if dailyGoal < 1 {
+            dailyGoal = 8 // Reasonable daily goal
+        }
     }
     
     private func saveSettings() {
+        // Validate durations before saving
+        validateAndFixDurations()
+        
         let newSettings = UserSettings(
             workDuration: Int(workDuration),
             shortBreakDuration: Int(shortBreakDuration),
@@ -551,7 +732,8 @@ struct PreferencesView: View {
             soundEnabled: soundEnabled,
             notificationsEnabled: notificationsEnabled,
             dailyGoal: Int(dailyGoal),
-            fullPomodoroMode: fullPomodoroMode
+            fullPomodoroMode: fullPomodoroMode,
+            autoStartBreaks: autoStartBreaks
         )
         dataManager.updateSettings(newSettings)
     }
@@ -657,9 +839,9 @@ struct KeyboardShortcutsView: View {
                     VStack(spacing: 12) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Reset Timer")
+                                Text("Reset to Work Session")
                                     .font(.headline)
-                                Text("Global shortcut for reset timer")
+                                Text("Global shortcut to start a fresh Pomodoro work session")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -726,6 +908,24 @@ struct KeyboardShortcutsView: View {
                     .foregroundColor(.secondary)
                 }
                 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Timer Controls:")
+                        .font(.headline)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• Stop Timer: Pauses your current session - you can resume where you left off")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• Reset to Work Session: Starts a fresh Pomodoro work session (⌘⇧R)")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• Use Reset when you want to abandon breaks and start a new focus session")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• Both options are available in the menu bar dropdown")
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+                
                 Spacer()
             }
             .padding()
@@ -738,6 +938,14 @@ struct GoalsView: View {
     @ObservedObject var dataManager: SessionDataManager
     @State private var showingGoalEditor = false
     @State private var newGoalText = ""
+    
+    private var displayGoalText: String {
+        if newGoalText.isEmpty {
+            let currentGoal = dataManager.getDailyGoal()
+            return currentGoal > 0 ? String(currentGoal) : "8"
+        }
+        return newGoalText
+    }
     
     var body: some View {
         ScrollView {
@@ -917,8 +1125,9 @@ struct GoalsView: View {
                         
                         HStack(spacing: 16) {
                             Button(action: {
-                                if let currentGoal = Int(newGoalText), currentGoal > 1 {
-                                    newGoalText = String(currentGoal - 1)
+                                let currentValue = newGoalText.isEmpty ? dataManager.getDailyGoal() : (Int(newGoalText) ?? dataManager.getDailyGoal())
+                                if currentValue > 1 {
+                                    newGoalText = String(currentValue - 1)
                                 }
                             }) {
                                 ZStack {
@@ -934,19 +1143,18 @@ struct GoalsView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             .contentShape(Circle())
-                            .disabled(Int(newGoalText) == nil || Int(newGoalText)! <= 1)
+                            .disabled((Int(displayGoalText) ?? 1) <= 1)
                             
-                            Text(newGoalText)
+                            Text(displayGoalText)
                                 .font(.title)
                                 .fontWeight(.semibold)
                                 .frame(minWidth: 80)
                                 .foregroundColor(.accentColor)
                             
                             Button(action: {
-                                if let currentGoal = Int(newGoalText), currentGoal < 20 {
-                                    newGoalText = String(currentGoal + 1)
-                                } else if Int(newGoalText) == nil {
-                                    newGoalText = "8"
+                                let currentValue = newGoalText.isEmpty ? dataManager.getDailyGoal() : (Int(newGoalText) ?? dataManager.getDailyGoal())
+                                if currentValue < 20 {
+                                    newGoalText = String(currentValue + 1)
                                 }
                             }) {
                                 ZStack {
@@ -962,7 +1170,7 @@ struct GoalsView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             .contentShape(Circle())
-                            .disabled(Int(newGoalText) != nil && Int(newGoalText)! >= 20)
+                            .disabled((Int(displayGoalText) ?? 8) >= 20)
                         }
                         
                         Text("pomodoros per day")
@@ -995,7 +1203,7 @@ struct GoalsView: View {
                     .background(Color.accentColor)
                     .foregroundColor(.white)
                     .cornerRadius(8)
-                    .disabled(Int(newGoalText) == nil || Int(newGoalText)! <= 0)
+                    .disabled((Int(displayGoalText) ?? 0) <= 0)
                 }
                 
                 Spacer()
