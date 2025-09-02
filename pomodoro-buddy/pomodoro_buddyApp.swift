@@ -116,8 +116,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if let button = statusItem?.button {
             button.title = "🍅"  // 🍅 tomato
-            button.action = #selector(toggleMenu)
-            button.target = self
+            // Remove custom action - let system handle menu normally
+            button.action = nil
+            button.target = nil
         }
         
         updateMenuBarTitle()
@@ -169,9 +170,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    @objc private func toggleMenu() {
-        statusItem?.button?.performClick(nil)
-    }
     
     private func setupMenu() {
         // Clean up existing menu to prevent memory leaks
@@ -195,10 +193,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(NSMenuItem.separator())
         }
         
-        // Dynamic start/pause button
-        let startPauseTitle = pomodoroTimer?.isRunning == true ? "Pause Timer" : "Start Timer"
-        menu.addItem(NSMenuItem(title: startPauseTitle, action: #selector(toggleStartPause), keyEquivalent: "s"))
-        menu.addItem(NSMenuItem(title: "Reset Timer", action: #selector(resetTimer), keyEquivalent: "r"))
+        // Dynamic timer controls
+        if let timer = pomodoroTimer {
+            if timer.isRunning {
+                menu.addItem(NSMenuItem(title: "Pause Timer", action: #selector(pauseTimer), keyEquivalent: "s"))
+                menu.addItem(NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: ""))
+                menu.addItem(NSMenuItem(title: "Reset to Work Session", action: #selector(resetToWorkSession), keyEquivalent: "r"))
+            } else if timer.isPaused {
+                menu.addItem(NSMenuItem(title: "Resume Timer", action: #selector(startTimer), keyEquivalent: "s"))
+                menu.addItem(NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: ""))
+                menu.addItem(NSMenuItem(title: "Reset to Work Session", action: #selector(resetToWorkSession), keyEquivalent: "r"))
+            } else {
+                menu.addItem(NSMenuItem(title: "Start Timer", action: #selector(startTimer), keyEquivalent: "s"))
+                menu.addItem(NSMenuItem(title: "Reset to Work Session", action: #selector(resetToWorkSession), keyEquivalent: "r"))
+            }
+        } else {
+            menu.addItem(NSMenuItem(title: "Start Timer", action: #selector(startTimer), keyEquivalent: "s"))
+            menu.addItem(NSMenuItem(title: "Reset to Work Session", action: #selector(resetToWorkSession), keyEquivalent: "r"))
+        }
         menu.addItem(NSMenuItem.separator())
         
         // Statistics window
@@ -216,6 +228,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
         
+        // Set menu for access by other methods, but control popup manually via action
         statusItem?.menu = menu
     }
     
@@ -335,23 +348,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     
-    @objc private func toggleStartPause() {
-        guard let timer = pomodoroTimer else { return }
-        
-        if timer.isRunning {
-            pomodoroTimer?.pause()
-        } else {
-            // Track session start time
-            sessionStartTime = Date()
-            pomodoroTimer?.start()
-        }
+    @objc private func startTimer() {
+        // Track session start time
+        sessionStartTime = Date()
+        pomodoroTimer?.start()
         
         // Update menu to reflect new state
         setupMenu()
     }
     
-    @objc private func resetTimer() {
+    @objc private func pauseTimer() {
+        pomodoroTimer?.pause()
+        
+        // Update menu to reflect new state
+        setupMenu()
+    }
+    
+    
+    @objc private func stopTimer() {
         pomodoroTimer?.reset()
+        sessionStartTime = nil
+        setupMenu() // Update menu to show "Start Timer"
+    }
+    
+    @objc private func resetToWorkSession() {
+        // Reset to a fresh work session
+        pomodoroTimer?.resetToWorkSession()
         sessionStartTime = nil
         setupMenu() // Update menu to show "Start Timer"
     }
@@ -556,10 +578,25 @@ extension AppDelegate: PomodoroTimerDelegate {
         // Update immediately without dispatch queue to avoid delays during menu interaction
         if Thread.isMainThread {
             self.updateMenuBarTitle()
+            // Don't refresh menu here - it causes the dropdown to disappear
+            // Menu will be refreshed when state changes occur
         } else {
             DispatchQueue.main.sync {
                 self.updateMenuBarTitle()
+                // Don't refresh menu here - it causes the dropdown to disappear
+                // Menu will be refreshed when state changes occur
             }
+        }
+    }
+    
+    func timerDidStart() {
+        // Track session start time for both manual and auto-started sessions
+        if sessionStartTime == nil {
+            sessionStartTime = Date()
+        }
+        // Refresh menu when timer state changes to running
+        DispatchQueue.main.async {
+            self.setupMenu()
         }
     }
     
@@ -610,12 +647,7 @@ extension AppDelegate: PomodoroTimerDelegate {
         
         // Play sound regardless of notification settings
         if settings.soundEnabled {
-            // Try a pleasant notification sound, fall back to beep
-            if let sound = NSSound(named: "Ping") {
-                sound.play()
-            } else {
-                NSSound.beep()
-            }
+            playCompletionSound()
         }
         
         // Only show notification if enabled in settings
@@ -684,15 +716,48 @@ extension AppDelegate: PomodoroTimerDelegate {
         }
         
     }
+    
+    private func playCompletionSound() {
+        // Use a longer alert sound that plays for about 2-3 seconds
+        let soundName = "Glass" // Glass is a longer, more attention-grabbing alert sound
+        
+        if let sound = NSSound(named: soundName) {
+            sound.play()
+        } else {
+            // Try alternative longer alert sounds
+            let alternativeSounds = ["Sosumi", "Tink", "Purr"]
+            var soundPlayed = false
+            
+            for altSound in alternativeSounds {
+                if let sound = NSSound(named: altSound) {
+                    sound.play()
+                    soundPlayed = true
+                    break
+                }
+            }
+            
+            // Final fallback to system beep if no alert sounds available
+            if !soundPlayed {
+                NSSound.beep()
+            }
+        }
+    }
 }
 
 extension AppDelegate: KeyboardShortcutManagerDelegate {
     func keyboardShortcutTriggered(action: String) {
         switch action {
         case "startPause":
-            toggleStartPause()
+            // Toggle between start/pause (not stop) for keyboard shortcuts
+            if let timer = pomodoroTimer {
+                if timer.isRunning {
+                    pauseTimer()
+                } else {
+                    startTimer()
+                }
+            }
         case "reset":
-            resetTimer()
+            resetToWorkSession()
         case "showStatistics":
             showStatistics()
         default:

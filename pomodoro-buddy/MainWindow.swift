@@ -498,7 +498,7 @@ struct PreferencesView: View {
                                         .frame(width: 60)
                                         .multilineTextAlignment(.center)
                                         .onChange(of: workDurationText) { newValue in
-                                            if let value = Double(newValue), value >= 5 {
+                                            if let value = Double(newValue), value >= 1 {
                                                 workDuration = value
                                             }
                                         }
@@ -507,7 +507,7 @@ struct PreferencesView: View {
                                         .foregroundColor(.secondary)
                                 }
                             }
-                            Slider(value: $workDuration, in: 5...60, step: 5)
+                            Slider(value: $workDuration, in: 1...60, step: 1)
                         }
                         
                         if fullPomodoroMode {
@@ -702,8 +702,8 @@ struct PreferencesView: View {
     }
     
     private func validateAndFixDurations() {
-        // Ensure minimum durations to prevent experimental short timers
-        if workDuration < 5 {
+        // Ensure minimum durations 
+        if workDuration < 1 {
             workDuration = 25 // Standard Pomodoro work duration
         }
         if shortBreakDuration < 1 {
@@ -839,9 +839,9 @@ struct KeyboardShortcutsView: View {
                     VStack(spacing: 12) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Reset Timer")
+                                Text("Reset to Work Session")
                                     .font(.headline)
-                                Text("Global shortcut for reset timer")
+                                Text("Global shortcut to start a fresh Pomodoro work session")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -902,6 +902,24 @@ struct KeyboardShortcutsView: View {
                         Text("• These shortcuts work even when the app is minimized")
                             .fixedSize(horizontal: false, vertical: true)
                         Text("• Avoid common shortcuts like ⌘C, ⌘V to prevent conflicts")
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Timer Controls:")
+                        .font(.headline)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• Stop Timer: Pauses your current session - you can resume where you left off")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• Reset to Work Session: Starts a fresh Pomodoro work session (⌘⇧R)")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• Use Reset when you want to abandon breaks and start a new focus session")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("• Both options are available in the menu bar dropdown")
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .font(.caption)
